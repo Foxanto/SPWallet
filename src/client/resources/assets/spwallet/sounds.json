@@ -1,0 +1,8 @@
+{
+  "payment_success": {
+    "subtitle": "subtitles.spwallet.payment_success",
+    "sounds": [
+      "spwallet:payment_success"
+    ]
+  }
+}

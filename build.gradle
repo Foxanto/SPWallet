@@ -1,0 +1,173 @@
+plugins {
+    id 'fabric-loom' version '1.18-SNAPSHOT'
+    id 'maven-publish'
+}
+
+// The Minecraft version rides along as semver build metadata, the way Fabric API and owo name their
+// releases: spwallet-1.0.0+1.21.11.jar. It lands in fabric.mod.json too, so a player can tell at a
+// glance which game version a jar is for.
+version = "${project.mod_version}+${project.minecraft_version}"
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        "spwallet" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "spwallet-test"
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
+// Without a cap the test client reserves a quarter of system RAM and dies with a native OOM on
+// machines that are already busy. The run config itself is created by configureTests above.
+loom.runs.named("clientGameTest") {
+    vmArgs "-Xmx1536M"
+}
+
+repositories {
+    maven {
+        name = 'Wisp Forest'
+        url = 'https://maven.wispforest.io'
+    }
+    maven {
+        // owo-lib depends on kdl4j, which is only published here.
+        name = 'JitPack'
+        url = 'https://jitpack.io'
+        content {
+            includeGroup 'com.github.kdl-org'
+        }
+    }
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/releases'
+    }
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
+    maven {
+        // YACL's own libraries. The Modrinth maven serves bare jars with no pom, so YACL's
+        // dependencies have to be named explicitly for the dev run to see them.
+        name = 'QuiltMC'
+        url = 'https://maven.quiltmc.org/repository/release'
+        content {
+            includeGroup 'org.quiltmc.parsers'
+        }
+    }
+}
+
+dependencies {
+    // To change the versions see the gradle.properties file
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // GUI toolkit the wallet screens are built with.
+    modImplementation "io.wispforest:owo-lib:${project.owo_version}"
+    annotationProcessor "io.wispforest:owo-lib:${project.owo_version}"
+    include "io.wispforest:owo-sentinel:${project.owo_version}"
+
+    // Config screen. Bundled so that players do not have to install it separately.
+    // The shipped jar carries these libraries itself; they are only repeated here for the dev run.
+    modImplementation "maven.modrinth:yacl:${project.yacl_version}"
+    include "maven.modrinth:yacl:${project.yacl_version}"
+    runtimeOnly "org.quiltmc.parsers:json:${project.quilt_parsers_version}"
+    runtimeOnly "org.quiltmc.parsers:gson:${project.quilt_parsers_version}"
+
+    // QR decoding for codes drawn on maps. Only the core module: the javase one would drag AWT in,
+    // and the pixels are fed to it as a plain int array anyway.
+    implementation "com.google.zxing:core:${project.zxing_version}"
+    include "com.google.zxing:core:${project.zxing_version}"
+
+    // Optional: only used to expose the config screen in the mod list.
+    modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+    modLocalRuntime "com.terraformersmc:modmenu:${project.modmenu_version}"
+}
+
+// The version the mod is built against is also the minimum it declares. Fabric API versions carry
+// the Minecraft version as build metadata ("0.141.0+1.21.11"), which has no place in a predicate.
+def fabricApiMinVersion = project.fabric_version.split('\\+')[0]
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "loader_version", project.loader_version
+    inputs.property "fabric_api_min_version", fabricApiMinVersion
+    filteringCharset "UTF-8"
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version,
+                "minecraft_version": project.minecraft_version,
+                "loader_version": project.loader_version,
+                "fabric_api_min_version": fabricApiMinVersion
+    }
+}
+
+def targetJavaVersion = 21
+tasks.withType(JavaCompile).configureEach {
+    // ensure that the encoding is set to UTF-8, no matter what the system default is
+    // this fixes some edge cases with special characters not displaying correctly
+    // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
+    // If Javadoc is generated, this must be specified in that task too.
+    it.options.encoding = "UTF-8"
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        it.options.release.set(targetJavaVersion)
+    }
+}
+
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+    // if it is present.
+    // If you remove this line, sources will not be generated.
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE.txt") {
+        rename { "LICENSE_${project.archives_base_name}.txt" }
+    }
+    from("NOTICE.md")
+}
+
+// configure the maven publication
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+
+    // See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+    repositories {
+        // Add repositories to publish to here.
+        // Notice: This block does NOT have the same function as the block in the top level.
+        // The repositories here will be used for publishing your artifact, not for
+        // retrieving dependencies.
+    }
+}

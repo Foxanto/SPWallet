@@ -1,0 +1,22 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "spwallet:icon/delete.png",
+      "height": 9,
+      "ascent": 8,
+      "chars": [
+        "\uD83D\uDDD1"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "spwallet:icon/save.png",
+      "height": 9,
+      "ascent": 8,
+      "chars": [
+        "\uD83D\uDCBE"
+      ]
+    }
+  ]
+}

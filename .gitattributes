@@ -1,0 +1,9 @@
+# Keep line endings sane across platforms. Without this, git's autocrlf on Windows commits
+# gradlew with CRLF, which makes it unrunnable on Linux and macOS.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+gradlew text eol=lf
+
+*.jar binary
+*.png binary
