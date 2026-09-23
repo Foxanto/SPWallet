@@ -9,7 +9,6 @@ import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.client.SPWalletClient;

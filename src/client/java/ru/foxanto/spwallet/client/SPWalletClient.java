@@ -21,10 +21,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
-import org.jetbrains.annotations.Nullable;
 import ru.foxanto.spwallet.SPWallet;
 import ru.foxanto.spwallet.api.Card;
-import ru.foxanto.spwallet.api.Transaction;
 import ru.foxanto.spwallet.commands.APICommand;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.gui.AddCardScreen;
@@ -38,50 +36,10 @@ import ru.foxanto.spwallet.util.SPServer;
 import ru.foxanto.spwallet.util.SignPayment;
 import ru.foxanto.spwallet.util.SignReader;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class SPWalletClient implements ClientModInitializer {
-    private static final Set<String> NICK_WHITELIST = Set.of(
-            "ac2ac1d8d619687ce26b7a1a3bd54ddc30c751740d94b6628b8bcbb3d6894f37",
-            "26d18aba4016ca3b49171ae43806b96ec598a51f873cff1bf77353c28e796fc4",
-            "c5c7fa5a3907d945dd612994cc9c85d4b78de82f28d997d47a1d10e31f0b7cc2",
-            "bdec17beec981a21991e1b8e9633d36d3e827f961d681cb4103948fde7271eab",
-            "f7d814bf20d5639ec1dd950a0a36d4d0d84bd209b5aea5deda9db71f50bff4eb",
-            "ddb2b9e26a1babdc28f5bdc0ad2b9d3b086216d6ae14e73973ba8ee79f82d645",
-            "ea396c3a567dd82303641ad3bc0b31aeb1fdf36ffedf4be6fc8e18404918b02d",
-            "03e04888fce880ace483734efd8bbfa3e4b625d199996d6a74625b8b2459daad",
-            "883c974b4a96abce68101c638e9c0efffc2292082b312b9f8507e7750fa836d1"
-    );
-    private static Boolean allowed;
-
-    private static boolean isAllowed() {
-        if (allowed == null) {
-            // The dev client logs in as "Player0", which is in no whitelist. Without this the mod
-            // switches itself off in runClient and runClientGameTest and nothing can be tested.
-            String name = Minecraft.getInstance().getUser().getName();
-            allowed = FabricLoader.getInstance().isDevelopmentEnvironment()
-                    || NICK_WHITELIST.contains(sha256Hex(name));
-        }
-        return allowed;
-    }
-
-    private static String sha256Hex(String s) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(s.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-    }
     /** Tail of the chat message the server prints when a card is created or looked up. */
     private static final String CARD_MESSAGE_SUFFIX =
             "] Управление картой "
@@ -108,7 +66,6 @@ public class SPWalletClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        if (!isAllowed()) return;
         SPWalletConfig.load();
         cards = new CardStorage();
 
@@ -160,7 +117,7 @@ public class SPWalletClient implements ClientModInitializer {
         });
 
         UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> {
-            if (!level.isClientSide() || !isAllowed()) {
+            if (!level.isClientSide()) {
                 return InteractionResult.PASS;
             }
 
@@ -224,7 +181,6 @@ public class SPWalletClient implements ClientModInitializer {
         }
 
         while (openWalletKey.consumeClick()) {
-            if (!isAllowed()) continue;
             SPServer server = SPServer.current();
 
             if (server == SPServer.OTHER) {
@@ -248,7 +204,6 @@ public class SPWalletClient implements ClientModInitializer {
      * a screen.
      */
     private static boolean openSignPayment(SignBlockEntity sign, LocalPlayer player) {
-        if (!isAllowed()) return false;
         SPServer server = SPServer.current();
 
         if (server == SPServer.OTHER) {
@@ -269,7 +224,6 @@ public class SPWalletClient implements ClientModInitializer {
 
     /** Offers to save the card described by a "Управление картой" chat message. */
     private static void onGameMessage(Component message) {
-        if (!isAllowed()) return;
         if (!SPWalletConfig.get().captureCardMessages) {
             return;
         }
