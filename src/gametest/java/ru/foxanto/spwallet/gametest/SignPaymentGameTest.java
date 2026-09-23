@@ -84,6 +84,20 @@ final class SignPaymentGameTest {
         expect(failures, "inflected label with a target", "79907", 0, "",
                 "", "Картой 79907", "", "");
 
+        // Card numbers that carry letters, which a card with a custom number has.
+        expect(failures, "letters instead of digits", "FURRY", 0, "",
+                "Карта: FURRY", "", "", "");
+        expect(failures, "digits in the middle of the letters", "M0BRO", 250, "За шкуры",
+                "За шкуры", "250 АР", "Карта M0BRO", "");
+        expect(failures, "a lettered number as a bare target", "SH0P1", 64, "",
+                "SH0P1", "", "64 АР", "");
+
+        // Upper case is what tells a card number apart from a five character nickname.
+        expectCardNumber(failures, "letters are a number", true, "Карта: FURRY", "", "", "");
+        expectCardNumber(failures, "digits are a number", true, "Карта: 70701", "", "", "");
+        expectCardNumber(failures, "lower case is a nickname", false, "Перевод: furry", "", "", "");
+        expectCardNumber(failures, "a longer name is a nickname", false, "Перевод: Foxanto", "", "", "");
+
         // Signs that are none of the mod's business.
         expectNothing(failures, "ordinary shop sign", "Магазин Стива", "Алмазы", "64", "");
         expectNothing(failures, "warp sign", "Спавн", "", "100", "");
@@ -113,6 +127,22 @@ final class SignPaymentGameTest {
                 || !payment.comment().equals(comment)) {
             failures.add(what + ": got " + payment + ", wanted target=" + target
                     + ", amount=" + amount + ", comment=" + comment);
+        }
+    }
+
+    /** Checks how the target of a sign is classified: a card number, or a nickname to look up. */
+    private static void expectCardNumber(List<String> failures, String what, boolean number,
+                                         String... lines) {
+        SignPayment payment = SignPayment.parse(lines);
+
+        if (payment == null) {
+            failures.add(what + ": not recognised as a payment sign");
+            return;
+        }
+
+        if (payment.targetIsCardNumber() != number) {
+            failures.add(what + ": " + payment.target() + " was read as "
+                    + (number ? "a nickname, wanted a card number" : "a card number, wanted a nickname"));
         }
     }
 

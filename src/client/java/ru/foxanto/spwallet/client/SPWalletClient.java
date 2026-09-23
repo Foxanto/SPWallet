@@ -49,8 +49,6 @@ public class SPWalletClient implements ClientModInitializer {
     /** Chat prefixes of the two servers, which are never card names. */
     private static final List<String> SERVER_PREFIXES = List.of("[СП]", "[СПм]");
 
-    private static final int CARD_NUMBER_LENGTH = 5;
-
     /** All of the mod's key bindings live in one category of the controls screen. */
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(SPWallet.id("wallet"));
 

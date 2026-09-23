@@ -18,6 +18,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import ru.foxanto.spwallet.SPWallet;
 import ru.foxanto.spwallet.api.Card;
+import ru.foxanto.spwallet.api.CardNumber;
 import ru.foxanto.spwallet.api.PlayerCard;
 import ru.foxanto.spwallet.api.SPWorldsApi;
 import ru.foxanto.spwallet.api.Transaction;
@@ -49,16 +50,12 @@ public class WalletScreen extends EssentialScreen {
      */
     private static final int CARD_PANEL_PERCENT = 40;
 
-    private static final int CARD_NUMBER_LENGTH = 5;
     private static final int MAX_AMOUNT_DIGITS = 6;
     private static final int MAX_COMMENT_LENGTH = 45;
     private static final int MAX_USERNAME_LENGTH = 16;
 
     /** What the API accepts inside a URL path; anything else comes back as a bare 400. */
     private static final Pattern NICKNAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
-
-    /** A five digit card number, which is what tells a number apart from a nickname. */
-    private static final Pattern CARD_NUMBER = Pattern.compile("\\d{5}");
 
     /** How tall the looked-up player's card list is; it scrolls when there are more. */
     private static final int PLAYER_CARDS_HEIGHT = 34;
@@ -117,7 +114,7 @@ public class WalletScreen extends EssentialScreen {
         this.prefilledTarget = target == null || target.isEmpty() ? null : target;
         this.prefilledAmount = amount;
         this.prefilledComment = comment;
-        this.mode = this.prefilledTarget != null && !CARD_NUMBER.matcher(this.prefilledTarget).matches()
+        this.mode = this.prefilledTarget != null && !CardNumber.is(this.prefilledTarget)
                 ? TransferMode.NICKNAME
                 : TransferMode.NUMBER;
         this.previousGuiScale = Minecraft.getInstance().options.guiScale().get();
@@ -161,7 +158,8 @@ public class WalletScreen extends EssentialScreen {
     protected void build(FlowLayout rootComponent) {
         this.numberBox = new EssentialTextBox(Sizing.fill(100),
                 Component.translatable("gui.spwallet.input.transfer.card_number"));
-        this.numberBox.textBox.setMaxLength(CARD_NUMBER_LENGTH);
+        this.numberBox.textBox.setMaxLength(CardNumber.LENGTH);
+        this.numberBox.textBox.setFilter(CardNumber::isBeingTyped);
 
         this.nicknameBox = new EssentialTextBox(Sizing.fill(100),
                 Component.translatable("gui.spwallet.input.transfer.nickname"));
@@ -218,7 +216,18 @@ public class WalletScreen extends EssentialScreen {
             this.findButton.active(this.canLookUp());
         };
 
-        this.numberBox.textBox.onChanged().subscribe(value -> this.revalidate.run());
+        this.numberBox.textBox.onChanged().subscribe(value -> {
+            String number = CardNumber.normalize(value);
+
+            // A number is always upper case, so typing it in lower case fixes itself. setValue()
+            // rather than text(): it leaves the caret at the end, where the next character goes.
+            if (!number.equals(value)) {
+                this.numberBox.textBox.setValue(number);
+                return;
+            }
+
+            this.revalidate.run();
+        });
         this.amountBox.textBox.onChanged().subscribe(value -> this.revalidate.run());
         this.nicknameBox.textBox.onChanged().subscribe(value -> {
             this.playerCards.clear();
@@ -429,8 +438,8 @@ public class WalletScreen extends EssentialScreen {
     /** The card number a transfer would go to, or {@code null} while the form is incomplete. */
     private @Nullable String receiver() {
         if (this.mode == TransferMode.NUMBER) {
-            String number = this.numberBox.value();
-            return number.length() == CARD_NUMBER_LENGTH && number.matches("[0-9]+") ? number : null;
+            String number = CardNumber.normalize(this.numberBox.value());
+            return CardNumber.is(number) ? number : null;
         }
 
         return this.selectedTarget == null ? null : this.selectedTarget.number();

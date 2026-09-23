@@ -1,6 +1,7 @@
 package ru.foxanto.spwallet.util;
 
 import org.jetbrains.annotations.Nullable;
+import ru.foxanto.spwallet.api.CardNumber;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,9 +89,6 @@ public record SignPayment(String target, int amount, String comment) {
             "^(\\d{1,7})\\s*(?:АР|AP|AR)?$",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
-    /** A five digit card number. */
-    private static final Pattern CARD_NUMBER = Pattern.compile("\\d{5}");
-
     /** A Minecraft name, which is also all the API will take inside a URL. */
     private static final Pattern NICKNAME = Pattern.compile("[A-Za-z0-9_]{3,16}");
 
@@ -104,7 +102,7 @@ public record SignPayment(String target, int amount, String comment) {
 
     /** Whether {@code target} names a card rather than a player. */
     public boolean targetIsCardNumber() {
-        return CARD_NUMBER.matcher(this.target).matches();
+        return CardNumber.is(this.target);
     }
 
     /**
@@ -217,7 +215,7 @@ public record SignPayment(String target, int amount, String comment) {
     }
 
     private static boolean isPayable(String value) {
-        return CARD_NUMBER.matcher(value).matches() || NICKNAME.matcher(value).matches();
+        return CardNumber.is(value) || NICKNAME.matcher(value).matches();
     }
 
     private static String strip(String value) {

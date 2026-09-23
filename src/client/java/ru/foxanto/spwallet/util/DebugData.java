@@ -28,7 +28,7 @@ public final class DebugData {
     private static final Map<String, String> NUMBERS = Map.of(
             SP_MAIN.id(), "10001",
             SP_SAVINGS.id(), "10002",
-            SPM_SHOP.id(), "20001");
+            SPM_SHOP.id(), "SH0P1");
 
     private static final Map<String, CardColor> COLORS = Map.of(
             SP_MAIN.id(), CardColor.BLUE,
@@ -41,7 +41,7 @@ public final class DebugData {
     /** What any nickname resolves to while debugging. */
     private static final List<PlayerCard> PLAYER_CARDS = List.of(
             new PlayerCard("Кошелёк", "31337"),
-            new PlayerCard("Донаты", "31338"));
+            new PlayerCard("Донаты", "FURRY"));
 
     private DebugData() {}
 
