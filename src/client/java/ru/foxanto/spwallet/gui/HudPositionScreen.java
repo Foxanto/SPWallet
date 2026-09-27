@@ -57,9 +57,9 @@ public class HudPositionScreen extends Screen {
         // Above the middle of the screen: clear of the corner the panel starts in and of the
         // hotbar, which the game still draws behind this screen.
         graphics.drawCenteredString(this.font, this.title, this.width / 2, this.height / 2 - 40,
-                EssentialColors.SCREEN_TITLE);
+                EssentialColors.screenTitle());
         graphics.drawCenteredString(this.font, Component.translatable("gui.spwallet.description.hud_position"),
-                this.width / 2, this.height / 2 - 26, EssentialColors.TAB_TEXT);
+                this.width / 2, this.height / 2 - 26, EssentialColors.tabText());
 
         List<Row> rows = this.rows();
         int width = CardPanel.width(this.font, rows, BalanceHud.STYLE);
@@ -70,7 +70,7 @@ public class HudPositionScreen extends Screen {
         CardPanel.render(graphics, this.font, rows, BalanceHud.STYLE, x, y);
 
         if (this.dragging || this.over(mouseX, mouseY)) {
-            graphics.renderOutline(x - 1, y - 1, width + 2, height + 2, EssentialColors.TAB_TEXT_SELECTED);
+            graphics.renderOutline(x - 1, y - 1, width + 2, height + 2, EssentialColors.tabTextSelected());
         }
     }
 
@@ -141,16 +141,19 @@ public class HudPositionScreen extends Screen {
 
     private List<Row> rows() {
         SPServer server = CardInfoCache.server();
-        List<Row> rows = server == null ? List.of() : CardInfoCache.rows(server);
+        List<Row> rows = server == null ? List.of() : CardInfoCache.favouriteRows(server);
         return rows.isEmpty() ? placeholder() : rows;
     }
 
-    /** Shown when there are no saved cards yet, so there is still something to drag. */
+    /**
+     * Shown when no card is on the HUD yet, so there is still something to drag. The real panel
+     * stays hidden until a card is starred, but its place can be chosen beforehand.
+     */
     private static List<Row> placeholder() {
         return List.of(
-                new Row(Component.translatable("gui.spwallet.panel.example_card").getString(),
-                        1337, false, null, CardColor.BLUE.argb()),
-                new Row(Component.translatable("gui.spwallet.panel.example_card_2").getString(),
-                        64, false, null, CardColor.YELLOW.argb()));
+                new Row("", Component.translatable("gui.spwallet.panel.example_card").getString(),
+                        1337, false, null, CardColor.BLUE.argb(), true),
+                new Row("", Component.translatable("gui.spwallet.panel.example_card_2").getString(),
+                        64, false, null, CardColor.YELLOW.argb(), true));
     }
 }

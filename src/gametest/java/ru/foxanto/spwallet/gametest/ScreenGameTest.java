@@ -13,7 +13,10 @@ import ru.foxanto.spwallet.gui.AddCardScreen;
 import ru.foxanto.spwallet.gui.EssentialScreen;
 import ru.foxanto.spwallet.gui.MessageScreen;
 import ru.foxanto.spwallet.gui.WalletScreen;
+import ru.foxanto.spwallet.config.SPWalletConfig;
+import ru.foxanto.spwallet.config.Theme;
 import ru.foxanto.spwallet.util.SPServer;
+import ru.foxanto.spwallet.util.TransferMode;
 
 import java.util.Arrays;
 import java.util.List;
@@ -43,6 +46,19 @@ public class ScreenGameTest implements FabricClientGameTest {
         openAndCheck(context, "message", () -> new MessageScreen(
                 Component.translatable("gui.spwallet.title.success"),
                 Component.translatable("gui.spwallet.description.balance")));
+
+        checkAmbiguousTarget(context);
+
+        // Every screen again in the light theme, for the same "owo could build it" check and for a
+        // screenshot of each to look over.
+        context.runOnClient(client -> SPWalletConfig.get().theme = Theme.LIGHT);
+        openAndCheck(context, "light_wallet", () -> new WalletScreen(SPServer.SP));
+        openAndCheck(context, "light_add_card",
+                () -> new AddCardScreen(SPServer.SP, new Card("Test card", "0000", "token")));
+        openAndCheck(context, "light_message", () -> new MessageScreen(
+                Component.translatable("gui.spwallet.title.success"),
+                Component.translatable("gui.spwallet.description.balance")));
+        context.runOnClient(client -> SPWalletConfig.get().theme = Theme.DARK);
 
         checkKeyBindings(context);
 
@@ -84,6 +100,34 @@ public class ScreenGameTest implements FabricClientGameTest {
         context.setScreen(() -> new KeyBindsScreen(null, Minecraft.getInstance().options));
         context.waitTicks(5);
         context.takeScreenshot("key_binds");
+    }
+
+    /**
+     * A target that is both a card number and a possible name has to end up on the by-nickname
+     * form, because a player of that name exists. {@code DebugData} answers every lookup with a
+     * card list, so in a dev environment the player always exists.
+     */
+    private static void checkAmbiguousTarget(ClientGameTestContext context) {
+        context.setScreen(() -> new WalletScreen(SPServer.SP, "FURRY", 0, ""));
+
+        // The lookup hands its answer back to the client thread, so it lands a tick or two later.
+        context.waitTicks(10);
+
+        String problem = context.computeOnClient(client -> {
+            if (!(client.screen instanceof WalletScreen wallet)) {
+                return "the wallet is not open any more";
+            }
+
+            return wallet.mode() == TransferMode.NICKNAME
+                    ? null
+                    : "it stayed on the " + wallet.mode() + " form";
+        });
+
+        if (problem != null) {
+            throw new AssertionError("FURRY should have been read as a nickname: " + problem);
+        }
+
+        context.takeScreenshot("wallet_ambiguous_target");
     }
 
     private static void openAndCheck(ClientGameTestContext context, String name,

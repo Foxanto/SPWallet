@@ -16,14 +16,23 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.jetbrains.annotations.Nullable;
 import ru.foxanto.spwallet.api.Card;
+import ru.foxanto.spwallet.client.SPWalletClient;
 import ru.foxanto.spwallet.gui.EssentialColors;
 
 import java.util.function.Consumer;
 
-/** One entry of the card list: the card's name, its balance and a delete button. */
+/**
+ * One entry of the card list: the card's name, its balance, a star and a delete button.
+ *
+ * <p>The star is the same one the inventory panel carries: it decides whether the card is drawn on
+ * the HUD while playing.
+ */
 public class CardButton extends FlowLayout {
     /** U+1F5D1 WASTEBASKET, provided by the mod's font entry in assets/minecraft/font/default.json. */
     private static final String DELETE_ICON = "🗑";
+
+    private static final String FAVOURITE_ICON = "★";
+    private static final String NOT_FAVOURITE_ICON = "☆";
 
     /** Width of the strip along the left edge that shows the card's colour. */
     private static final int COLOR_STRIP_WIDTH = 3;
@@ -33,7 +42,7 @@ public class CardButton extends FlowLayout {
     private final CardNumberButton numberButton = new CardNumberButton();
 
     /** The card's colour, which is only known once {@code /accounts/me} has answered. */
-    private int color = EssentialColors.BORDER;
+    private int color = EssentialColors.border();
 
     public boolean selected = false;
     private Consumer<Card> onPress = card -> {};
@@ -43,10 +52,19 @@ public class CardButton extends FlowLayout {
 
         this.card = card;
 
+        TransparentButton favouriteButton = new TransparentButton(Component.literal(NOT_FAVOURITE_ICON),
+                EssentialColors.tabText(),
+                EssentialColors.modalText(),
+                EssentialColors.tabTextSelected(),
+                button -> {});
+        favourite(favouriteButton, SPWalletClient.cards().isFavourite(card.id()));
+        favouriteButton.onPress(button ->
+                favourite(button, SPWalletClient.cards().toggleFavourite(card.id())));
+
         TransparentButton deleteButton = new TransparentButton(Component.literal(DELETE_ICON),
-                EssentialColors.TAB_TEXT,
-                EssentialColors.MODAL_TEXT,
-                EssentialColors.ERROR,
+                EssentialColors.tabText(),
+                EssentialColors.modalText(),
+                EssentialColors.error(),
                 button -> onDelete.accept(this.card));
         deleteButton.tooltip(Component.translatable("gui.spwallet.description.delete_card.tooltip"));
 
@@ -54,22 +72,32 @@ public class CardButton extends FlowLayout {
                 .child(UIContainers.verticalFlow(Sizing.fill(100), Sizing.content())
                         .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
                                 .child(UIComponents.label(Component.literal(card.name()))
-                                        .color(Color.ofArgb(EssentialColors.MODAL_TEXT))
-                                        .shadow(true))
+                                        .color(Color.ofArgb(EssentialColors.modalText()))
+                                        .shadow(EssentialColors.textShadow()))
                                 .child(this.numberButton)
                                 // Eats the leftover width, which pins the delete button to the
                                 // right edge instead of letting a long name push it out of view.
                                 // The height has to be pinned: a spacer expands on both axes.
                                 .child(UIComponents.spacer().verticalSizing(Sizing.fixed(0)))
+                                .child(favouriteButton)
                                 .child(deleteButton)
                                 .gap(4))
                         .child(new CardBalanceLabel(card)
-                                .color(Color.ofArgb(EssentialColors.CARD_BALANCE))
+                                .color(Color.ofArgb(EssentialColors.cardBalance()))
                                 .shadow(false))
                         .gap(4)
                         .margins(Insets.top(2))
                         .verticalAlignment(VerticalAlignment.CENTER))
                 .margins(Insets.both(10, 8)));
+    }
+
+    /** Puts the star into the state {@code favourite} and says what pressing it would do. */
+    private static void favourite(TransparentButton button, boolean favourite) {
+        button.selected = favourite;
+        button.text(Component.literal(favourite ? FAVOURITE_ICON : NOT_FAVOURITE_ICON));
+        button.tooltip(Component.translatable(favourite
+                ? "gui.spwallet.panel.unfavourite"
+                : "gui.spwallet.panel.favourite"));
     }
 
     public CardButton onPress(Consumer<Card> onPress) {
@@ -101,9 +129,9 @@ public class CardButton extends FlowLayout {
     @Override
     public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
         if (this.selected || this.hovered) {
-            this.surface(Surface.flat(EssentialColors.BORDER));
+            this.surface(Surface.flat(EssentialColors.border()));
         } else {
-            this.surface(Surface.flat(EssentialColors.BACKGROUND));
+            this.surface(Surface.flat(EssentialColors.background()));
         }
 
         super.draw(context, mouseX, mouseY, partialTicks, delta);

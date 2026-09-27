@@ -8,6 +8,7 @@ import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
+import io.wispforest.owo.ui.core.Positioning;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
@@ -23,6 +24,7 @@ import ru.foxanto.spwallet.api.PlayerCard;
 import ru.foxanto.spwallet.api.SPWorldsApi;
 import ru.foxanto.spwallet.api.Transaction;
 import ru.foxanto.spwallet.client.SPWalletClient;
+import ru.foxanto.spwallet.config.ConfigScreen;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.gui.component.CardList;
 import ru.foxanto.spwallet.gui.component.EssentialButton;
@@ -30,6 +32,7 @@ import ru.foxanto.spwallet.gui.component.EssentialScrollContainer;
 import ru.foxanto.spwallet.gui.component.EssentialTextBox;
 import ru.foxanto.spwallet.gui.component.PlayerCardList;
 import ru.foxanto.spwallet.gui.component.TabBar;
+import ru.foxanto.spwallet.gui.component.TransparentButton;
 import ru.foxanto.spwallet.util.CardInfoCache;
 import ru.foxanto.spwallet.util.PaymentSound;
 import ru.foxanto.spwallet.util.SPServer;
@@ -78,6 +81,7 @@ public class WalletScreen extends EssentialScreen {
     private EssentialTextBox amountBox;
     private EssentialTextBox commentBox;
     private EssentialButton findButton;
+    private TabBar<TransferMode> modeTabs;
     private EssentialButton transferButton;
     private PlayerCardList playerCards;
     private EssentialScrollContainer playerCardsScroll;
@@ -118,6 +122,11 @@ public class WalletScreen extends EssentialScreen {
                 ? TransferMode.NICKNAME
                 : TransferMode.NUMBER;
         this.previousGuiScale = Minecraft.getInstance().options.guiScale().get();
+    }
+
+    /** Which of the two transfer forms the screen is showing. */
+    public TransferMode mode() {
+        return this.mode;
     }
 
     /** The GUI scale that was active before this screen forced its own. */
@@ -248,13 +257,13 @@ public class WalletScreen extends EssentialScreen {
         });
         serverTabs.padding(Insets.of(10, 10, 12, 12));
 
-        TabBar<TransferMode> modeTabs = new TabBar<>(List.of(TransferMode.values()), this.mode,
+        this.modeTabs = new TabBar<>(List.of(TransferMode.values()), this.mode,
                 TransferMode::label, selected -> {
             this.mode = selected;
             this.rebuildForm();
             this.revalidate.run();
         });
-        modeTabs.padding(Insets.of(10, 10, 12, 12));
+        this.modeTabs.padding(Insets.of(10, 10, 12, 12));
 
         this.revalidate.run();
 
@@ -263,15 +272,16 @@ public class WalletScreen extends EssentialScreen {
                         .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(30))
                                 .child(UIContainers.horizontalFlow(Sizing.fill(CARD_PANEL_PERCENT), Sizing.fill(100))
                                         .child(UIComponents.label(Component.translatable("gui.spwallet.title.cards"))
-                                                .color(Color.ofArgb(EssentialColors.SCREEN_TITLE))
-                                                .shadow(true)
+                                                .color(Color.ofArgb(EssentialColors.screenTitle()))
+                                                .shadow(EssentialColors.textShadow())
                                                 .margins(Insets.of(11, 0, 13, 0)))
                                         .surface(EssentialSurfaces.NAV_LEFT))
                                 .child(UIContainers.horizontalFlow(Sizing.fill(100 - CARD_PANEL_PERCENT), Sizing.fill(100))
                                         .child(UIComponents.label(Component.translatable("gui.spwallet.title.transfer"))
-                                                .color(Color.ofArgb(EssentialColors.SCREEN_TITLE))
-                                                .shadow(true)
+                                                .color(Color.ofArgb(EssentialColors.screenTitle()))
+                                                .shadow(EssentialColors.textShadow())
                                                 .margins(Insets.of(11, 0, 10, 0)))
+                                        .child(this.settingsButton())
                                         .surface(EssentialSurfaces.NAV_RIGHT)))
 
                         .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(30))
@@ -279,7 +289,7 @@ public class WalletScreen extends EssentialScreen {
                                         .child(serverTabs)
                                         .surface(EssentialSurfaces.PANEL_LEFT))
                                 .child(UIContainers.horizontalFlow(Sizing.fill(100 - CARD_PANEL_PERCENT), Sizing.fill(100))
-                                        .child(modeTabs)
+                                        .child(this.modeTabs)
                                         .surface(EssentialSurfaces.PANEL_RIGHT_TOP)))
 
                         .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(72))
@@ -298,11 +308,96 @@ public class WalletScreen extends EssentialScreen {
 
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.CENTER)
-                .surface(Surface.flat(EssentialColors.BACKGROUND));
+                .surface(Surface.flat(EssentialColors.background()));
 
         if (this.mode == TransferMode.NICKNAME && this.prefilledTarget != null) {
             this.findPlayerCards();
+        } else if (this.prefilledTarget != null && CardNumber.isAmbiguous(this.prefilledTarget)) {
+            this.resolveAmbiguousTarget(this.prefilledTarget);
         }
+    }
+
+    /** The gear in the corner of the transfer header, which opens the mod's settings. */
+    private UIComponent settingsButton() {
+        TransparentButton button = new TransparentButton(Component.literal("⚙"),
+                EssentialColors.tabText(),
+                EssentialColors.tabTextHovered(),
+                EssentialColors.tabTextHovered(),
+                pressed -> this.openSettings());
+
+        button.shadow(EssentialColors.textShadow());
+        button.tooltip(Component.translatable("gui.spwallet.button.settings"));
+        button.positioning(Positioning.relative(100, 0));
+        button.margins(Insets.of(11, 0, 0, 12));
+
+        return button;
+    }
+
+    /**
+     * Swaps the wallet for the settings screen, and comes back to a fresh wallet afterwards: owo
+     * builds a screen once, so only a new one picks up a changed theme in the colours it takes
+     * when it is built. What was typed into the form is carried over.
+     */
+    private void openSettings() {
+        // Put the player's own scale back first, so that the wallet waiting behind the settings
+        // remembers that one rather than the forced scale as the one to restore.
+        this.closing = true;
+
+        if (SPWalletConfig.get().forceGuiScale) {
+            applyGuiScale(this.previousGuiScale);
+        }
+
+        // A half typed card number would be taken for a nickname, so only a whole one is kept.
+        String target = this.mode == TransferMode.NUMBER
+                ? (CardNumber.is(this.numberBox.value()) ? this.numberBox.value() : null)
+                : this.nicknameBox.value();
+        int amount;
+
+        try {
+            amount = Integer.parseInt(this.amountBox.value());
+        } catch (NumberFormatException e) {
+            amount = 0;
+        }
+
+        WalletScreen wallet = new WalletScreen(this.server, target, amount, this.commentBox.value());
+        Minecraft.getInstance().setScreen(ConfigScreen.create(wallet));
+    }
+
+    /**
+     * Decides whether a target like {@code FURRY} meant a card number or a player of that name.
+     *
+     * <p>The form is already set up for the card number, which is what the answer falls back to.
+     * A player who actually goes by that name wins instead: they are the one a sign naming them
+     * meant to be paid, and their card list is shown so that the card can still be picked from it —
+     * the card whose number matches their name usually being in it.
+     */
+    private void resolveAmbiguousTarget(String target) {
+        Card card = this.selectedCard;
+
+        if (card == null) {
+            return;
+        }
+
+        Minecraft client = Minecraft.getInstance();
+
+        SPWorldsApi.playerCards(card, target)
+                .thenAcceptAsync(found -> {
+                    // The answer is late and unasked for, so it only applies while the form is
+                    // still exactly as it was left: anything typed or clicked wins over it.
+                    if (found.isEmpty() || this.mode != TransferMode.NUMBER
+                            || !this.numberBox.value().equals(target)) {
+                        return;
+                    }
+
+                    this.nicknameBox.textBox.text(target);
+                    this.playerCards.show(found, target);
+                    this.modeTabs.select(TransferMode.NICKNAME);
+                }, client)
+                .exceptionally(throwable -> {
+                    // Nobody by that name: it was a card number, which the form already holds.
+                    SPWallet.LOGGER.debug("No player called {}, reading it as a card number", target);
+                    return null;
+                });
     }
 
     /** Puts the fields of the current {@link TransferMode} into the form, keeping what was typed. */
@@ -340,20 +435,20 @@ public class WalletScreen extends EssentialScreen {
         // also called straight from build() - an exception there would blank the whole screen.
         if (!NICKNAME.matcher(nickname).matches()) {
             this.playerCards.message(Component.translatable("gui.spwallet.description.bad_nickname"),
-                    EssentialColors.ERROR);
+                    EssentialColors.error());
             return;
         }
 
         Minecraft client = Minecraft.getInstance();
         this.playerCards.message(Component.translatable("gui.spwallet.description.searching"),
-                EssentialColors.CARD_BALANCE);
+                EssentialColors.cardBalance());
 
         SPWorldsApi.playerCards(card, nickname)
                 .thenAcceptAsync(found -> {
                     if (found.isEmpty()) {
                         this.playerCards.message(
                                 Component.translatable("gui.spwallet.description.no_player_cards"),
-                                EssentialColors.ERROR);
+                                EssentialColors.error());
                     } else {
                         this.playerCards.show(found);
                     }
@@ -366,7 +461,7 @@ public class WalletScreen extends EssentialScreen {
 
                     this.playerCards.message(
                             Component.translatable("gui.spwallet.description.player_not_found", nickname),
-                            EssentialColors.ERROR);
+                            EssentialColors.error());
                     this.revalidate.run();
 
                     return null;
@@ -398,9 +493,9 @@ public class WalletScreen extends EssentialScreen {
                         .child(UIComponents.label(Component
                                         .translatable("modal.spwallet.delete_card.description")
                                         .append(card.name() + "?"))
-                                .color(Color.ofArgb(EssentialColors.MODAL_TEXT))
+                                .color(Color.ofArgb(EssentialColors.modalText()))
                                 .horizontalTextAlignment(HorizontalAlignment.CENTER)
-                                .shadow(true)
+                                .shadow(EssentialColors.textShadow())
                                 .horizontalSizing(Sizing.fill(100)))
                         .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
                                 .child(new EssentialButton(EssentialButton.Style.NEUTRAL,
@@ -419,12 +514,12 @@ public class WalletScreen extends EssentialScreen {
                                 .horizontalAlignment(HorizontalAlignment.CENTER))
                         .gap(18)
                         .margins(Insets.of(17)))
-                .surface(Surface.flat(EssentialColors.BACKGROUND)
-                        .and(Surface.outline(EssentialColors.MODAL_OUTLINE)));
+                .surface(Surface.flat(EssentialColors.background())
+                        .and(Surface.outline(EssentialColors.modalOutline())));
 
         OverlayContainer<UIComponent> container = UIContainers.overlay(content);
         container.closeOnClick(false);
-        container.surface(Surface.flat(EssentialColors.OVERLAY_DIM));
+        container.surface(Surface.flat(EssentialColors.overlayDim()));
         overlay.set(container);
 
         return container;

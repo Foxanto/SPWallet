@@ -7,6 +7,7 @@ import ru.foxanto.spwallet.api.AccountCard;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.api.SPWorldsApi;
 import ru.foxanto.spwallet.client.SPWalletClient;
+import ru.foxanto.spwallet.storage.CardStorage;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,12 +42,14 @@ public final class CardInfoCache {
     /**
      * One card as a panel shows it.
      *
+     * @param id the card id, which is what a favourite is remembered by
      * @param balance the balance, or {@code null} while it is loading or when it failed
      * @param number the card number, or {@code null} until {@code /accounts/me} has answered
      * @param color the card's colour, or {@code null} when it is not known
+     * @param favourite whether the card is one of those the HUD shows
      */
-    public record Row(String name, @Nullable Integer balance, boolean failed,
-                      @Nullable String number, @Nullable Integer color) {}
+    public record Row(String id, String name, @Nullable Integer balance, boolean failed,
+                      @Nullable String number, @Nullable Integer color, boolean favourite) {}
 
     private CardInfoCache() {}
 
@@ -66,12 +69,32 @@ public final class CardInfoCache {
 
     /** The saved cards of {@code server}, fetching whatever is missing or stale on the way. */
     public static List<Row> rows(SPServer server) {
-        if (SPWalletClient.cards() == null) {
+        return rows(server, false);
+    }
+
+    /**
+     * Only the cards the player put on the HUD, which is all the HUD panel draws. None of them
+     * means no panel at all, which is how the HUD is turned on in the first place.
+     */
+    public static List<Row> favouriteRows(SPServer server) {
+        return rows(server, true);
+    }
+
+    private static List<Row> rows(SPServer server, boolean favouritesOnly) {
+        CardStorage storage = SPWalletClient.cards();
+
+        if (storage == null) {
             return List.of();
         }
 
-        List<Card> cards = SPWalletClient.cards().cards(server);
+        List<Card> cards = storage.cards(server);
         long now = System.currentTimeMillis();
+
+        // Filtered before the balances are refreshed, so a card that is not on the HUD costs no
+        // request while the player is simply walking around.
+        if (favouritesOnly) {
+            cards = cards.stream().filter(card -> storage.isFavourite(card.id())).toList();
+        }
 
         if (!cards.isEmpty()) {
             refreshAccount(server, cards.get(0), now);
@@ -83,9 +106,10 @@ public final class CardInfoCache {
             refreshBalance(card, now);
 
             AccountCard account = ACCOUNT_CARDS.get(card.id());
-            rows.add(new Row(card.name(), BALANCES.get(card.id()), FAILED.contains(card.id()),
+            rows.add(new Row(card.id(), card.name(), BALANCES.get(card.id()), FAILED.contains(card.id()),
                     account == null ? null : account.number(),
-                    account == null ? null : account.color()));
+                    account == null ? null : account.color(),
+                    storage.isFavourite(card.id())));
         }
 
         return rows;

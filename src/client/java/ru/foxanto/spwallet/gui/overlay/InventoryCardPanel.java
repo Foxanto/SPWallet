@@ -17,6 +17,8 @@ import ru.foxanto.spwallet.config.PanelSide;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.gui.EssentialColors;
 import ru.foxanto.spwallet.gui.HudPositionScreen;
+import ru.foxanto.spwallet.gui.overlay.CardPanel.Bounds;
+import ru.foxanto.spwallet.client.SPWalletClient;
 import ru.foxanto.spwallet.mixin.client.AbstractContainerScreenAccessor;
 import ru.foxanto.spwallet.util.CardInfoCache;
 import ru.foxanto.spwallet.util.SPServer;
@@ -28,6 +30,9 @@ import java.util.List;
  *
  * <p>Its header carries two buttons: one moves the panel to the next side, the other opens the HUD
  * position editor, since the inventory is where a player is most likely to look for either.
+ *
+ * <p>Every card is listed here, favourite or not, and clicking a row is what makes a card a
+ * favourite: only those are drawn on the HUD.
  */
 public final class InventoryCardPanel {
     private static final int GAP = 4;
@@ -43,19 +48,16 @@ public final class InventoryCardPanel {
      * on: at the usual GUI scales there are only about 150 pixels beside the inventory.
      */
     private static final List<CardPanel.Style> STYLES = List.of(
-            new CardPanel.Style(Component.literal("SPWallet"), 20, true),
-            new CardPanel.Style(Component.literal("SPWallet"), 20, false));
+            new CardPanel.Style(Component.literal("SPWallet"), 20, true, true),
+            new CardPanel.Style(Component.literal("SPWallet"), 20, false, true));
 
     /** Where the two header buttons were last drawn, for the click that follows. */
     private static @Nullable Bounds switchButton;
     private static @Nullable Bounds moveHudButton;
 
-    private record Bounds(int x, int y, int width, int height) {
-        boolean contains(double mouseX, double mouseY) {
-            return mouseX >= this.x && mouseX < this.x + this.width
-                    && mouseY >= this.y && mouseY < this.y + this.height;
-        }
-    }
+    /** Where each card row was last drawn, and which card it belongs to. */
+    private static List<Bounds> cardRows = List.of();
+    private static List<CardInfoCache.Row> cardsShown = List.of();
 
     private InventoryCardPanel() {}
 
@@ -70,6 +72,8 @@ public final class InventoryCardPanel {
             ScreenEvents.remove(screen).register(removed -> {
                 switchButton = null;
                 moveHudButton = null;
+                cardRows = List.of();
+                cardsShown = List.of();
             });
         });
     }
@@ -77,6 +81,8 @@ public final class InventoryCardPanel {
     private static void render(Screen screen, GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         switchButton = null;
         moveHudButton = null;
+        cardRows = List.of();
+        cardsShown = List.of();
 
         if (!SPWalletConfig.get().inventoryPanel) {
             return;
@@ -135,7 +141,17 @@ public final class InventoryCardPanel {
         x = Math.clamp(x, 0, Math.max(0, screen.width - width));
         y = Math.clamp(y, 0, Math.max(0, screen.height - height));
 
-        CardPanel.render(graphics, font, rows, style, x, y);
+        cardRows = CardPanel.render(graphics, font, rows, style, x, y, mouseX, mouseY);
+        cardsShown = rows;
+
+        for (int i = 0; i < rows.size(); i++) {
+            if (cardRows.get(i).contains(mouseX, mouseY)) {
+                graphics.setTooltipForNextFrame(font, Component.translatable(rows.get(i).favourite()
+                        ? "gui.spwallet.panel.unfavourite"
+                        : "gui.spwallet.panel.favourite"), mouseX, mouseY);
+                break;
+            }
+        }
 
         int iconY = CardPanel.headerY(y);
         int switchX = x + width - CardPanel.PADDING - font.width(SWITCH_ICON);
@@ -155,7 +171,8 @@ public final class InventoryCardPanel {
         boolean hovered = bounds.contains(mouseX, mouseY);
 
         graphics.drawString(font, icon, x, y,
-                hovered ? EssentialColors.TAB_TEXT_SELECTED : EssentialColors.TAB_TEXT, true);
+                hovered ? EssentialColors.tabTextSelected() : EssentialColors.tabText(),
+                EssentialColors.textShadow());
 
         if (hovered) {
             graphics.setTooltipForNextFrame(font, tooltip, mouseX, mouseY);
@@ -182,6 +199,14 @@ public final class InventoryCardPanel {
             playClick();
             Minecraft.getInstance().setScreen(new HudPositionScreen(screen));
             return false;
+        }
+
+        for (int i = 0; i < cardRows.size() && i < cardsShown.size(); i++) {
+            if (cardRows.get(i).contains(click.x(), click.y())) {
+                SPWalletClient.cards().toggleFavourite(cardsShown.get(i).id());
+                playClick();
+                return false;
+            }
         }
 
         return true;

@@ -15,9 +15,9 @@ public class CardNumberButton extends TransparentButton {
 
     public CardNumberButton() {
         super(Component.empty(),
-                EssentialColors.CARD_BALANCE,
-                EssentialColors.TAB_TEXT_HOVERED,
-                EssentialColors.TAB_TEXT_HOVERED,
+                EssentialColors.cardBalance(),
+                EssentialColors.tabTextHovered(),
+                EssentialColors.tabTextHovered(),
                 button -> {});
 
         this.shadow(false);

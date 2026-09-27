@@ -43,6 +43,10 @@ public class SPWalletConfig {
     @SerialEntry
     public boolean paymentSound = true;
 
+    /** Which palette the mod's screens and panels are drawn in. */
+    @SerialEntry
+    public Theme theme = Theme.DARK;
+
     /** Show the balances of the saved cards on the HUD. */
     @SerialEntry
     public boolean hudEnabled = true;

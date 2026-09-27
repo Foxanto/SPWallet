@@ -14,7 +14,7 @@ public class EssentialScrollContainer extends ScrollContainer<UIComponent> {
                                     UIComponent child) {
         super(direction, horizontalSizing, verticalSizing, child);
 
-        this.scrollbar(Scrollbar.flat(Color.ofArgb(EssentialColors.SCROLLBAR)));
+        this.scrollbar(Scrollbar.flat(Color.ofArgb(EssentialColors.scrollbar())));
         this.scrollbarThiccness(3);
 
         // Keeps the scrollbar drawn at full opacity instead of fading out when idle.

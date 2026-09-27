@@ -5,6 +5,7 @@ import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 import ru.foxanto.spwallet.api.PlayerCard;
 import ru.foxanto.spwallet.gui.EssentialColors;
 
@@ -30,14 +31,30 @@ public class PlayerCardList extends FlowLayout {
 
     /** Replaces the contents with {@code cards}, selecting the first one. */
     public void show(List<PlayerCard> cards) {
+        this.show(cards, null);
+    }
+
+    /**
+     * Replaces the contents with {@code cards}, selecting the one numbered {@code preferred} and
+     * the first one when there is no such card.
+     *
+     * <p>The preferred number is the one a sign named: when it turns out to be a player's name as
+     * well, the card actually carrying that number is the one that was meant.
+     */
+    public void show(List<PlayerCard> cards, @Nullable String preferred) {
         this.clear();
+
+        PlayerCard wanted = cards.stream()
+                .filter(card -> card.number().equals(preferred))
+                .findFirst()
+                .orElse(cards.isEmpty() ? null : cards.get(0));
 
         for (PlayerCard card : cards) {
             TransparentButton row = new TransparentButton(
                     Component.literal(card.name() + " #" + card.number()),
-                    EssentialColors.CARD_BALANCE,
-                    EssentialColors.TAB_TEXT_HOVERED,
-                    EssentialColors.TAB_TEXT_SELECTED,
+                    EssentialColors.cardBalance(),
+                    EssentialColors.tabTextHovered(),
+                    EssentialColors.tabTextSelected(),
                     button -> {});
 
             row.onPress(button -> {
@@ -49,7 +66,7 @@ public class PlayerCardList extends FlowLayout {
                 this.onSelect.accept(card);
             });
 
-            if (this.rows.isEmpty()) {
+            if (card == wanted) {
                 row.selected = true;
                 this.onSelect.accept(card);
             }

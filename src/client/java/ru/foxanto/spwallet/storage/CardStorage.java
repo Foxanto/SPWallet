@@ -18,20 +18,29 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Keeps the player's cards in {@code config/spwallet-cards.json}.
  *
  * <p>SPWorlds Pay used an SQLite database for this. A player owns a handful of cards at most, so
  * plain JSON keeps the same data without a database driver on the client.
+ *
+ * <p>The same file records which cards are favourites, by card id and across both servers: those
+ * are the ones the HUD panel shows.
  */
 public class CardStorage {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Path file;
     private final Map<String, List<Card>> cards = new LinkedHashMap<>();
+
+    /** Ids of the cards shown on the HUD, in the order they were picked. */
+    private final Set<String> favourites = new LinkedHashSet<>();
 
     public CardStorage() {
         this(FabricLoader.getInstance().getConfigDir().resolve("spwallet-cards.json"));
@@ -78,8 +87,26 @@ public class CardStorage {
         List<Card> serverCards = this.cards.get(server.key());
 
         if (serverCards != null && serverCards.remove(card)) {
+            this.favourites.remove(card.id());
             this.save();
         }
+    }
+
+    /** Whether the card {@code cardId} is shown on the HUD. */
+    public boolean isFavourite(String cardId) {
+        return this.favourites.contains(cardId);
+    }
+
+    /** Adds the card to the HUD or takes it off it, and returns which of the two happened. */
+    public boolean toggleFavourite(String cardId) {
+        boolean favourite = !this.favourites.remove(cardId);
+
+        if (favourite) {
+            this.favourites.add(cardId);
+        }
+
+        this.save();
+        return favourite;
     }
 
     /** Renames {@code card}, keeping its position in the list. */
@@ -109,6 +136,7 @@ public class CardStorage {
 
     public final void load() {
         this.cards.clear();
+        this.favourites.clear();
 
         if (!Files.exists(this.file)) {
             return;
@@ -116,6 +144,10 @@ public class CardStorage {
 
         try (Reader reader = Files.newBufferedReader(this.file, StandardCharsets.UTF_8)) {
             StoredCards stored = GSON.fromJson(reader, StoredCards.class);
+
+            if (stored != null && stored.favourites != null) {
+                stored.favourites.stream().filter(Objects::nonNull).forEach(this.favourites::add);
+            }
 
             if (stored != null && stored.cards != null) {
                 stored.cards.forEach((key, list) -> {
@@ -144,19 +176,21 @@ public class CardStorage {
             Files.createDirectories(this.file.getParent());
 
             try (Writer writer = Files.newBufferedWriter(this.file, StandardCharsets.UTF_8)) {
-                GSON.toJson(new StoredCards(this.cards), writer);
+                GSON.toJson(new StoredCards(this.cards, new ArrayList<>(this.favourites)), writer);
             }
         } catch (IOException e) {
             SPWallet.LOGGER.error("Could not write {}", this.file, e);
         }
     }
 
-    /** On-disk shape of the card file. */
+    /** On-disk shape of the card file. A file written before favourites existed simply has none. */
     private static final class StoredCards {
         private Map<String, List<Card>> cards;
+        private List<String> favourites;
 
-        StoredCards(Map<String, List<Card>> cards) {
+        StoredCards(Map<String, List<Card>> cards, List<String> favourites) {
             this.cards = cards;
+            this.favourites = favourites;
         }
     }
 }

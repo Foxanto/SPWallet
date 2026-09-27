@@ -28,7 +28,7 @@ public class CardBalanceLabel extends LabelComponent {
                     SPWallet.LOGGER.warn("Could not read the balance of card {}", card.id(), throwable);
 
                     this.text(Component.translatable("gui.spwallet.description.balance_error"));
-                    this.color(Color.ofArgb(EssentialColors.ERROR));
+                    this.color(Color.ofArgb(EssentialColors.error()));
 
                     return null;
                 }, client);

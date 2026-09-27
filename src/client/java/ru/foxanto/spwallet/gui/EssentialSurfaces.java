@@ -14,8 +14,15 @@ public final class EssentialSurfaces {
 
     private EssentialSurfaces() {}
 
+    /**
+     * A panel background in both themes. Which one is drawn is decided per frame, so switching the
+     * theme shows at once rather than when the screen is next opened.
+     */
     private static Surface panel(String name) {
-        var texture = SPWallet.id("panel/" + name);
-        return (context, component) -> NinePatchTexture.draw(texture, context, component);
+        var dark = SPWallet.id("panel/" + name);
+        var light = SPWallet.id("light/panel/" + name);
+
+        return (context, component) ->
+                NinePatchTexture.draw(EssentialColors.light() ? light : dark, context, component);
     }
 }

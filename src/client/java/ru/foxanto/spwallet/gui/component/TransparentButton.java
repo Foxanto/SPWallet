@@ -35,9 +35,14 @@ public class TransparentButton extends LabelComponent {
         return this;
     }
 
+    /** Runs the press handler, for a button pressed from code rather than clicked. */
+    public void press() {
+        this.onPress.accept(this);
+    }
+
     @Override
     public boolean onMouseDown(MouseButtonEvent click, boolean doubled) {
-        this.onPress.accept(this);
+        this.press();
         Minecraft.getInstance().getSoundManager()
                 .play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 

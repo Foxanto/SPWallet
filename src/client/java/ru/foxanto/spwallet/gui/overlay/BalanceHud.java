@@ -10,12 +10,17 @@ import ru.foxanto.spwallet.util.SPServer;
 
 import java.util.List;
 
-/** The balances of the saved cards, drawn on the HUD wherever the player has put them. */
+/**
+ * The balances of the favourite cards, drawn on the HUD wherever the player has put them.
+ *
+ * <p>Only the cards starred in the inventory panel are here, and with none starred there is no
+ * panel at all - that is what the star is for.
+ */
 public final class BalanceHud {
     /** Kept between the panel and the edge of the screen, whatever the saved position. */
     public static final int MARGIN = 4;
 
-    public static final CardPanel.Style STYLE = new CardPanel.Style(null, 0, false);
+    public static final CardPanel.Style STYLE = new CardPanel.Style(null, 0, false, false);
 
     private BalanceHud() {}
 
@@ -36,7 +41,7 @@ public final class BalanceHud {
             return;
         }
 
-        List<CardInfoCache.Row> rows = CardInfoCache.rows(server);
+        List<CardInfoCache.Row> rows = CardInfoCache.favouriteRows(server);
 
         if (rows.isEmpty()) {
             return;
