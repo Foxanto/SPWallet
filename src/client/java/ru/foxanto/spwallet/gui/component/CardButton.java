@@ -9,6 +9,7 @@ import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -18,14 +19,17 @@ import org.jetbrains.annotations.Nullable;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.client.SPWalletClient;
 import ru.foxanto.spwallet.gui.EssentialColors;
+import ru.foxanto.spwallet.util.CardInfoCache;
 
 import java.util.function.Consumer;
 
 /**
- * One entry of the card list: the card's name, its balance, a star and a delete button.
+ * One entry of the card list: the card's name, its balance, a notification toggle, a star and a
+ * delete button.
  *
  * <p>The star is the same one the inventory panel carries: it decides whether the card is drawn on
- * the HUD while playing.
+ * the HUD while playing. The note beside it turns the card's incoming money notifications on and
+ * off.
  */
 public class CardButton extends FlowLayout {
     /** U+1F5D1 WASTEBASKET, provided by the mod's font entry in assets/minecraft/font/default.json. */
@@ -33,6 +37,9 @@ public class CardButton extends FlowLayout {
 
     private static final String FAVOURITE_ICON = "★";
     private static final String NOT_FAVOURITE_ICON = "☆";
+
+    /** Lit when the card's incoming money is announced, dimmed when it is not. */
+    private static final String INCOMING_ICON = "♪";
 
     /** Width of the strip along the left edge that shows the card's colour. */
     private static final int COLOR_STRIP_WIDTH = 3;
@@ -61,6 +68,18 @@ public class CardButton extends FlowLayout {
         favouriteButton.onPress(button ->
                 favourite(button, SPWalletClient.cards().toggleFavourite(card.id())));
 
+        TransparentButton incomingButton = new TransparentButton(Component.literal(INCOMING_ICON),
+                EssentialColors.tabText(),
+                EssentialColors.modalText(),
+                EssentialColors.tabTextSelected(),
+                button -> {});
+        incoming(incomingButton, SPWalletClient.cards().notifiesIncoming(card.id()));
+        incomingButton.onPress(button -> {
+            boolean notifies = SPWalletClient.cards().toggleIncoming(card.id());
+            CardInfoCache.incomingToggled(card.id(), notifies);
+            incoming(button, notifies);
+        });
+
         TransparentButton deleteButton = new TransparentButton(Component.literal(DELETE_ICON),
                 EssentialColors.tabText(),
                 EssentialColors.modalText(),
@@ -82,9 +101,14 @@ public class CardButton extends FlowLayout {
                                 .child(favouriteButton)
                                 .child(deleteButton)
                                 .gap(4))
-                        .child(new CardBalanceLabel(card)
-                                .color(Color.ofArgb(EssentialColors.cardBalance()))
-                                .shadow(false))
+                        // The note sits under the star rather than beside it: the name line has no
+                        // room left for a third icon once the card number is shown.
+                        .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
+                                .child(new CardBalanceLabel(card)
+                                        .color(Color.ofArgb(EssentialColors.cardBalance()))
+                                        .shadow(false))
+                                .child(UIComponents.spacer().verticalSizing(Sizing.fixed(0)))
+                                .child(incomingButton))
                         .gap(4)
                         .margins(Insets.top(2))
                         .verticalAlignment(VerticalAlignment.CENTER))
@@ -98,6 +122,18 @@ public class CardButton extends FlowLayout {
         button.tooltip(Component.translatable(favourite
                 ? "gui.spwallet.panel.unfavourite"
                 : "gui.spwallet.panel.favourite"));
+    }
+
+    /** Lights the note when the card's incoming money is announced and says what pressing it does. */
+    private static void incoming(TransparentButton button, boolean notifies) {
+        button.selected = notifies;
+        // Struck through when off, so the state reads without telling two greys apart.
+        button.text(notifies
+                ? Component.literal(INCOMING_ICON)
+                : Component.literal(INCOMING_ICON).withStyle(ChatFormatting.STRIKETHROUGH));
+        button.tooltip(Component.translatable(notifies
+                ? "gui.spwallet.card.incoming_on"
+                : "gui.spwallet.card.incoming_off"));
     }
 
     public CardButton onPress(Consumer<Card> onPress) {

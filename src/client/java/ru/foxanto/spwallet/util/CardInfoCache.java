@@ -23,8 +23,8 @@ import java.util.Set;
  * wallet: the HUD and the inventory.
  *
  * <p>Those panels are drawn every frame, so they read from here and never call the API themselves.
- * A value is fetched when it is first asked for and again once it is older than its TTL. With the
- * whole API capped at 200 requests a minute, a balance a minute per card leaves plenty of room.
+ * A value is fetched when it is first asked for and again once it is older than its TTL: a minute
+ * normally, the check interval while incoming notifications are on (see {@link #balanceTtl}).
  *
  * <p>It is also where incoming money is noticed, for as long as the API cannot list transactions:
  * a balance that comes back higher than the one before means money came in, and
@@ -35,6 +35,11 @@ import java.util.Set;
  */
 public final class CardInfoCache {
     private static final long BALANCE_TTL_MS = 60_000;
+    /**
+     * Balance requests a minute the incoming money checks may take. The API allows 200 a minute;
+     * the rest is left for the wallet, transfers and nickname lookups.
+     */
+    private static final int CHECK_BUDGET_PER_MINUTE = 150;
     private static final long ACCOUNT_TTL_MS = 5 * 60_000;
 
     private static final Map<String, Integer> BALANCES = new HashMap<>();
@@ -43,6 +48,11 @@ public final class CardInfoCache {
     private static final Set<String> BALANCE_LOADING = new HashSet<>();
     /** When a balance was last learned from a transfer, which beats any request sent before it. */
     private static final Map<String, Long> BALANCE_CHANGED = new HashMap<>();
+    /**
+     * Cards whose notifications were just turned back on. They were not checked while off, so the
+     * balance known for them is stale, and the next answer is taken as the new baseline instead.
+     */
+    private static final Set<String> RESYNC = new HashSet<>();
 
     private static final Map<String, AccountCard> ACCOUNT_CARDS = new HashMap<>();
     private static final Map<SPServer, Long> ACCOUNT_FETCHED = new HashMap<>();
@@ -137,9 +147,9 @@ public final class CardInfoCache {
     }
 
     /**
-     * Keeps every card of the current server checked once a minute while incoming notifications
-     * are on, whether or not a panel shows it. Called every tick; the TTL decides when a request
-     * actually goes out, so it costs one request per card a minute.
+     * Keeps every card of the current server checked while incoming notifications are on, whether
+     * or not a panel shows it. Called every tick; {@link #balanceTtl} decides when a request
+     * actually goes out.
      */
     public static void pollBalances() {
         CardStorage storage = SPWalletClient.cards();
@@ -156,8 +166,21 @@ public final class CardInfoCache {
 
         long now = System.currentTimeMillis();
 
+        // A card with its notifications off costs no request here; the HUD still asks for it if
+        // it is shown there.
         for (Card card : storage.cards(server)) {
-            refreshBalance(card, now);
+            if (storage.notifiesIncoming(card.id())) {
+                refreshBalance(card, now);
+            }
+        }
+    }
+
+    /** Called when the player turns a card's notifications on or off. */
+    public static void incomingToggled(String cardId, boolean notifies) {
+        if (notifies) {
+            RESYNC.add(cardId);
+        } else {
+            RESYNC.remove(cardId);
         }
     }
 
@@ -167,7 +190,7 @@ public final class CardInfoCache {
      *
      * <p>An answer to a request sent before the player's own transfer went through is dropped: it
      * holds the balance from before the transfer, and taking it would look like the money coming
-     * back. Public for the game test, which has no API to get a rise from.
+     * back. Public for the wallet, whose balance labels ask the API themselves.
      */
     public static void balanceFetched(Card card, int balance, long requestedAt) {
         String id = card.id();
@@ -179,20 +202,51 @@ public final class CardInfoCache {
 
         Integer previous = BALANCES.put(id, balance);
         FAILED.remove(id);
+        // Whoever asked - the checks or the wallet - the answer is as good as a check.
+        BALANCE_FETCHED.put(id, System.currentTimeMillis());
 
-        // Nothing to compare with on the first answer after the game starts.
-        if (previous != null && balance > previous) {
+        boolean resync = RESYNC.remove(id);
+        CardStorage storage = SPWalletClient.cards();
+
+        // Nothing to compare with on the first answer after the game starts, nor on the first one
+        // after the card's notifications were turned back on.
+        if (previous != null && !resync && balance > previous
+                && storage != null && storage.notifiesIncoming(id)) {
             AccountCard account = ACCOUNT_CARDS.get(id);
             IncomingNotifications.push(card.name(), account == null ? null : account.color(),
                     balance - previous, balance);
         }
     }
 
+    /**
+     * How old a balance may get. While incoming notifications are on that is the check interval the
+     * player set, stretched when there are so many cards that checking them all that often would
+     * take more than {@link #CHECK_BUDGET_PER_MINUTE} requests a minute.
+     */
+    static long balanceTtl() {
+        SPWalletConfig config = SPWalletConfig.get();
+        CardStorage storage = SPWalletClient.cards();
+        SPServer server = server();
+
+        if (!config.incomingNotifications || storage == null || server == null) {
+            return BALANCE_TTL_MS;
+        }
+
+        long interval = Math.max(1, config.incomingCheckSeconds) * 1000L;
+        long checked = storage.cards(server).stream().filter(card -> storage.notifiesIncoming(card.id())).count();
+        long budgeted = checked * 60_000L / CHECK_BUDGET_PER_MINUTE;
+        return Math.max(interval, budgeted);
+    }
+
     private static void refreshBalance(Card card, long now) {
         String id = card.id();
         Long fetched = BALANCE_FETCHED.get(id);
 
-        if (BALANCE_LOADING.contains(id) || (fetched != null && now - fetched < BALANCE_TTL_MS)) {
+        CardStorage storage = SPWalletClient.cards();
+        // A card with its notifications off is only kept as fresh as a panel needs it.
+        long ttl = storage != null && !storage.notifiesIncoming(id) ? BALANCE_TTL_MS : balanceTtl();
+
+        if (BALANCE_LOADING.contains(id) || (fetched != null && now - fetched < ttl)) {
             return;
         }
 

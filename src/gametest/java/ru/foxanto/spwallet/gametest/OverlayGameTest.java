@@ -118,6 +118,26 @@ public class OverlayGameTest implements FabricClientGameTest {
             // Going down is never a notification.
             CardInfoCache.balanceFetched(card, 900, System.currentTimeMillis() + 2);
             expectNotifications(1);
+
+            // With the card's notifications off, a rise says nothing.
+            boolean notifies = SPWalletClient.cards().toggleIncoming(card.id());
+            CardInfoCache.incomingToggled(card.id(), notifies);
+
+            if (notifies) {
+                throw new AssertionError("The card was expected to start with notifications on");
+            }
+
+            CardInfoCache.balanceFetched(card, 950, System.currentTimeMillis() + 3);
+            expectNotifications(1);
+
+            // Turned back on, the first answer is only a new baseline, since the card was not
+            // checked meanwhile; a rise after it is announced again.
+            notifies = SPWalletClient.cards().toggleIncoming(card.id());
+            CardInfoCache.incomingToggled(card.id(), notifies);
+            CardInfoCache.balanceFetched(card, 2_000, System.currentTimeMillis() + 4);
+            expectNotifications(1);
+            CardInfoCache.balanceFetched(card, 2_010, System.currentTimeMillis() + 5);
+            expectNotifications(2);
         });
 
         // Past the slide in, so the screenshot shows it where it settles.

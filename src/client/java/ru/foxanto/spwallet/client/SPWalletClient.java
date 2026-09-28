@@ -39,8 +39,13 @@ import ru.foxanto.spwallet.util.SPServer;
 import ru.foxanto.spwallet.util.SignPayment;
 import ru.foxanto.spwallet.util.SignReader;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Set;
 
 public class SPWalletClient implements ClientModInitializer {
     /** Tail of the chat message the server prints when a card is created or looked up. */
@@ -51,7 +56,6 @@ public class SPWalletClient implements ClientModInitializer {
 
     /** Chat prefixes of the two servers, which are never card names. */
     private static final List<String> SERVER_PREFIXES = List.of("[СП]", "[СПм]");
-
     /** All of the mod's key bindings live in one category of the controls screen. */
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(SPWallet.id("wallet"));
 

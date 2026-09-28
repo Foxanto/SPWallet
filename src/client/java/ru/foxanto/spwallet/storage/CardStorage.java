@@ -31,7 +31,8 @@ import java.util.Set;
  * plain JSON keeps the same data without a database driver on the client.
  *
  * <p>The same file records which cards are favourites, by card id and across both servers: those
- * are the ones the HUD panel shows.
+ * are the ones the HUD panel shows. It also records the cards whose incoming money notifications
+ * the player turned off.
  */
 public class CardStorage {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -41,6 +42,9 @@ public class CardStorage {
 
     /** Ids of the cards shown on the HUD, in the order they were picked. */
     private final Set<String> favourites = new LinkedHashSet<>();
+
+    /** Ids of the cards that give no incoming money notification. Every other card does. */
+    private final Set<String> muted = new LinkedHashSet<>();
 
     public CardStorage() {
         this(FabricLoader.getInstance().getConfigDir().resolve("spwallet-cards.json"));
@@ -88,6 +92,7 @@ public class CardStorage {
 
         if (serverCards != null && serverCards.remove(card)) {
             this.favourites.remove(card.id());
+            this.muted.remove(card.id());
             this.save();
         }
     }
@@ -107,6 +112,23 @@ public class CardStorage {
 
         this.save();
         return favourite;
+    }
+
+    /** Whether money coming in to the card {@code cardId} is announced. */
+    public boolean notifiesIncoming(String cardId) {
+        return !this.muted.contains(cardId);
+    }
+
+    /** Turns the card's incoming money notifications on or off, and returns which it is now. */
+    public boolean toggleIncoming(String cardId) {
+        boolean notifies = this.muted.remove(cardId);
+
+        if (!notifies) {
+            this.muted.add(cardId);
+        }
+
+        this.save();
+        return notifies;
     }
 
     /** Renames {@code card}, keeping its position in the list. */
@@ -137,6 +159,7 @@ public class CardStorage {
     public final void load() {
         this.cards.clear();
         this.favourites.clear();
+        this.muted.clear();
 
         if (!Files.exists(this.file)) {
             return;
@@ -147,6 +170,10 @@ public class CardStorage {
 
             if (stored != null && stored.favourites != null) {
                 stored.favourites.stream().filter(Objects::nonNull).forEach(this.favourites::add);
+            }
+
+            if (stored != null && stored.mutedIncoming != null) {
+                stored.mutedIncoming.stream().filter(Objects::nonNull).forEach(this.muted::add);
             }
 
             if (stored != null && stored.cards != null) {
@@ -176,21 +203,26 @@ public class CardStorage {
             Files.createDirectories(this.file.getParent());
 
             try (Writer writer = Files.newBufferedWriter(this.file, StandardCharsets.UTF_8)) {
-                GSON.toJson(new StoredCards(this.cards, new ArrayList<>(this.favourites)), writer);
+                GSON.toJson(new StoredCards(this.cards, new ArrayList<>(this.favourites), new ArrayList<>(this.muted)), writer);
             }
         } catch (IOException e) {
             SPWallet.LOGGER.error("Could not write {}", this.file, e);
         }
     }
 
-    /** On-disk shape of the card file. A file written before favourites existed simply has none. */
+    /**
+     * On-disk shape of the card file. A file written before favourites or muted cards existed simply
+     * has none of them.
+     */
     private static final class StoredCards {
         private Map<String, List<Card>> cards;
         private List<String> favourites;
+        private List<String> mutedIncoming;
 
-        StoredCards(Map<String, List<Card>> cards, List<String> favourites) {
+        StoredCards(Map<String, List<Card>> cards, List<String> favourites, List<String> mutedIncoming) {
             this.cards = cards;
             this.favourites = favourites;
+            this.mutedIncoming = mutedIncoming;
         }
     }
 }

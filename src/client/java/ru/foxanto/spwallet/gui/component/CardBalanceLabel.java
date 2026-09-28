@@ -16,11 +16,14 @@ public class CardBalanceLabel extends LabelComponent {
         super(Component.translatable("gui.spwallet.description.balance").append("..."));
 
         Minecraft client = Minecraft.getInstance();
+        long requestedAt = System.currentTimeMillis();
 
         SPWorldsApi.balance(card)
                 .thenAcceptAsync(balance -> {
-                    // The HUD shows the same balance; no point in it asking again.
-                    CardInfoCache.balanceChanged(card, balance);
+                    // The HUD shows the same balance; no point in it asking again. Passed on as a
+                    // check rather than a change, so money that came in since the last check is
+                    // still noticed instead of quietly becoming the new baseline.
+                    CardInfoCache.balanceFetched(card, balance, requestedAt);
                     this.text(Component.translatable("gui.spwallet.description.balance")
                             .append(String.valueOf(balance)));
                 }, client)

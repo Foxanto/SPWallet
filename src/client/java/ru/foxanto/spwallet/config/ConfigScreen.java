@@ -9,6 +9,7 @@ import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
 import dev.isxander.yacl3.api.controller.FloatSliderControllerBuilder;
+import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -78,6 +79,19 @@ public final class ConfigScreen {
                                 .option(toggle("incoming_notifications", defaults.incomingNotifications,
                                         () -> config.incomingNotifications,
                                         value -> config.incomingNotifications = value))
+                                .option(Option.<Integer>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.incoming_check_seconds"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.incoming_check_seconds.description")))
+                                        .binding(defaults.incomingCheckSeconds,
+                                                () -> config.incomingCheckSeconds,
+                                                value -> config.incomingCheckSeconds = value)
+                                        .controller(option -> IntegerSliderControllerBuilder.create(option)
+                                                .range(5, 60)
+                                                .step(5)
+                                                .formatValue(value -> Component.translatable(
+                                                        "config.spwallet.option.incoming_check_seconds.value", value)))
+                                        .build())
                                 .option(toggle("incoming_sound", defaults.incomingSound,
                                         () -> config.incomingSound,
                                         value -> config.incomingSound = value))

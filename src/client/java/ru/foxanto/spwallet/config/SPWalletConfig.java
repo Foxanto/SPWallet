@@ -57,10 +57,18 @@ public class SPWalletConfig {
 
     /**
      * Show a notification when a card's balance goes up. A stopgap until the SPWorlds API can list
-     * transactions: the mod checks the balances once a minute and reports any rise.
+     * transactions: the mod checks the balances every {@link #incomingCheckSeconds} and reports any rise.
      */
     @SerialEntry
     public boolean incomingNotifications = true;
+
+    /**
+     * How often the balances are checked for that, in seconds. Each check is one request per card;
+     * with many cards the checks are spaced out further so the API's 200 requests a minute are not
+     * used up.
+     */
+    @SerialEntry
+    public int incomingCheckSeconds = 5;
 
     /** Play a sound with that notification. */
     @SerialEntry
