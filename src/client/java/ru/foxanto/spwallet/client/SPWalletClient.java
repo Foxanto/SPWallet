@@ -29,8 +29,11 @@ import ru.foxanto.spwallet.gui.AddCardScreen;
 import ru.foxanto.spwallet.gui.MessageScreen;
 import ru.foxanto.spwallet.gui.WalletScreen;
 import ru.foxanto.spwallet.gui.overlay.BalanceHud;
+import ru.foxanto.spwallet.gui.overlay.IncomingNotifications;
 import ru.foxanto.spwallet.gui.overlay.InventoryCardPanel;
 import ru.foxanto.spwallet.storage.CardStorage;
+import ru.foxanto.spwallet.util.CardInfoCache;
+import ru.foxanto.spwallet.util.PaymentSound;
 import ru.foxanto.spwallet.util.QrScanner;
 import ru.foxanto.spwallet.util.SPServer;
 import ru.foxanto.spwallet.util.SignPayment;
@@ -66,6 +69,7 @@ public class SPWalletClient implements ClientModInitializer {
     public void onInitializeClient() {
         SPWalletConfig.load();
         cards = new CardStorage();
+        PaymentSound.createFolder();
 
         // Client command: handled locally, never sent to the Minecraft server.
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
@@ -93,6 +97,9 @@ public class SPWalletClient implements ClientModInitializer {
         // Under the chat, so a message is never hidden behind the balances.
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, SPWallet.id("balances"),
                 BalanceHud::render);
+        // Over the chat, since the bottom left corner the notifications start in is where it is.
+        HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, SPWallet.id("incoming"),
+                IncomingNotifications::render);
         InventoryCardPanel.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(SPWalletClient::onEndTick);
@@ -172,6 +179,8 @@ public class SPWalletClient implements ClientModInitializer {
     }
 
     private static void onEndTick(Minecraft client) {
+        CardInfoCache.pollBalances();
+
         while (scanQrKey.consumeClick()) {
             if (SPWalletConfig.get().qrPayments) {
                 QrScanner.scan(client);

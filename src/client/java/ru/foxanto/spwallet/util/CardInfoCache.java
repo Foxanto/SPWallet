@@ -7,6 +7,8 @@ import ru.foxanto.spwallet.api.AccountCard;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.api.SPWorldsApi;
 import ru.foxanto.spwallet.client.SPWalletClient;
+import ru.foxanto.spwallet.config.SPWalletConfig;
+import ru.foxanto.spwallet.gui.overlay.IncomingNotifications;
 import ru.foxanto.spwallet.storage.CardStorage;
 
 import java.util.ArrayList;
@@ -24,6 +26,11 @@ import java.util.Set;
  * A value is fetched when it is first asked for and again once it is older than its TTL. With the
  * whole API capped at 200 requests a minute, a balance a minute per card leaves plenty of room.
  *
+ * <p>It is also where incoming money is noticed, for as long as the API cannot list transactions:
+ * a balance that comes back higher than the one before means money came in, and
+ * {@link IncomingNotifications} says so. For that the balances of all the cards on the current server
+ * are kept fresh by {@link #pollBalances()}, not only those a panel shows.
+ *
  * <p>Only touched from the render thread: every answer is handed back to it before it is stored.
  */
 public final class CardInfoCache {
@@ -34,6 +41,8 @@ public final class CardInfoCache {
     private static final Set<String> FAILED = new HashSet<>();
     private static final Map<String, Long> BALANCE_FETCHED = new HashMap<>();
     private static final Set<String> BALANCE_LOADING = new HashSet<>();
+    /** When a balance was last learned from a transfer, which beats any request sent before it. */
+    private static final Map<String, Long> BALANCE_CHANGED = new HashMap<>();
 
     private static final Map<String, AccountCard> ACCOUNT_CARDS = new HashMap<>();
     private static final Map<SPServer, Long> ACCOUNT_FETCHED = new HashMap<>();
@@ -115,11 +124,68 @@ public final class CardInfoCache {
         return rows;
     }
 
-    /** Records a balance learned elsewhere, such as the one a transfer answers with. */
+    /**
+     * Records a balance learned elsewhere, such as the one a transfer answers with. Never a
+     * notification: the player's own transfer only ever lowers the balance.
+     */
     public static void balanceChanged(Card card, int balance) {
+        long now = System.currentTimeMillis();
         BALANCES.put(card.id(), balance);
         FAILED.remove(card.id());
-        BALANCE_FETCHED.put(card.id(), System.currentTimeMillis());
+        BALANCE_FETCHED.put(card.id(), now);
+        BALANCE_CHANGED.put(card.id(), now);
+    }
+
+    /**
+     * Keeps every card of the current server checked once a minute while incoming notifications
+     * are on, whether or not a panel shows it. Called every tick; the TTL decides when a request
+     * actually goes out, so it costs one request per card a minute.
+     */
+    public static void pollBalances() {
+        CardStorage storage = SPWalletClient.cards();
+
+        if (!SPWalletConfig.get().incomingNotifications || storage == null || Minecraft.getInstance().player == null) {
+            return;
+        }
+
+        SPServer server = server();
+
+        if (server == null) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+
+        for (Card card : storage.cards(server)) {
+            refreshBalance(card, now);
+        }
+    }
+
+    /**
+     * Stores a balance the API answered with for a request sent at {@code requestedAt}, and reports
+     * a rise over the balance known before as incoming money.
+     *
+     * <p>An answer to a request sent before the player's own transfer went through is dropped: it
+     * holds the balance from before the transfer, and taking it would look like the money coming
+     * back. Public for the game test, which has no API to get a rise from.
+     */
+    public static void balanceFetched(Card card, int balance, long requestedAt) {
+        String id = card.id();
+        Long changed = BALANCE_CHANGED.get(id);
+
+        if (changed != null && changed >= requestedAt) {
+            return;
+        }
+
+        Integer previous = BALANCES.put(id, balance);
+        FAILED.remove(id);
+
+        // Nothing to compare with on the first answer after the game starts.
+        if (previous != null && balance > previous) {
+            AccountCard account = ACCOUNT_CARDS.get(id);
+            IncomingNotifications.push(card.name(), account == null ? null : account.color(),
+                    balance - previous, balance);
+        }
     }
 
     private static void refreshBalance(Card card, long now) {
@@ -142,8 +208,7 @@ public final class CardInfoCache {
                 SPWallet.LOGGER.warn("Could not read the balance of card {}", id, error);
                 FAILED.add(id);
             } else {
-                BALANCES.put(id, balance);
-                FAILED.remove(id);
+                balanceFetched(card, balance, now);
             }
         }, client);
     }

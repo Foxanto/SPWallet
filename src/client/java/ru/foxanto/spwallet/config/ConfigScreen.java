@@ -8,10 +8,13 @@ import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
+import dev.isxander.yacl3.api.controller.FloatSliderControllerBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import ru.foxanto.spwallet.gui.HudPositionScreen;
+import ru.foxanto.spwallet.gui.SoundPickerScreen;
+import ru.foxanto.spwallet.util.PaymentSound;
 
 /**
  * The settings screen, built with YACL. Kept apart from {@link ModMenuIntegration} because Mod Menu
@@ -45,9 +48,46 @@ public final class ConfigScreen {
                                 .option(toggle("payment_sound", defaults.paymentSound,
                                         () -> config.paymentSound,
                                         value -> config.paymentSound = value))
+                                .option(ButtonOption.createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.payment_sound_choice"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.payment_sound_choice.description")))
+                                        .action(screen -> Minecraft.getInstance()
+                                                .setScreen(new SoundPickerScreen(screen, PaymentSound.Slot.PAYMENT)))
+                                        .build())
+                                .option(Option.<Float>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.payment_sound_volume"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.payment_sound_volume.description")))
+                                        .binding(defaults.paymentSoundVolume,
+                                                () -> config.paymentSoundVolume,
+                                                value -> config.paymentSoundVolume = value)
+                                        .controller(option -> FloatSliderControllerBuilder.create(option)
+                                                .range(0F, 1F)
+                                                .step(0.05F)
+                                                .formatValue(value -> Component.literal(Math.round(value * 100) + "%")))
+                                        .build())
                                 .option(toggle("force_gui_scale", defaults.forceGuiScale,
                                         () -> config.forceGuiScale,
                                         value -> config.forceGuiScale = value))
+                                .build())
+                        .group(OptionGroup.createBuilder()
+                                .name(Component.translatable("config.spwallet.group.incoming"))
+                                .description(OptionDescription.of(Component.translatable(
+                                        "config.spwallet.group.incoming.description")))
+                                .option(toggle("incoming_notifications", defaults.incomingNotifications,
+                                        () -> config.incomingNotifications,
+                                        value -> config.incomingNotifications = value))
+                                .option(toggle("incoming_sound", defaults.incomingSound,
+                                        () -> config.incomingSound,
+                                        value -> config.incomingSound = value))
+                                .option(ButtonOption.createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.incoming_sound_choice"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.incoming_sound_choice.description")))
+                                        .action(screen -> Minecraft.getInstance()
+                                                .setScreen(new SoundPickerScreen(screen, PaymentSound.Slot.INCOMING)))
+                                        .build())
                                 .build())
                         .group(OptionGroup.createBuilder()
                                 .name(Component.translatable("config.spwallet.group.display"))

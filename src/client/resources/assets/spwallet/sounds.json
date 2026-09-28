@@ -4,5 +4,20 @@
     "sounds": [
       "spwallet:payment_success"
     ]
+  },
+  "notification": {
+    "subtitle": "subtitles.spwallet.notification",
+    "sounds": [
+      "spwallet:notification"
+    ]
+  },
+  "custom": {
+    "subtitle": "subtitles.spwallet.payment_success",
+    "sounds": [
+      {
+        "name": "fabric-sound-api-v1:empty",
+        "stream": true
+      }
+    ]
   }
 }

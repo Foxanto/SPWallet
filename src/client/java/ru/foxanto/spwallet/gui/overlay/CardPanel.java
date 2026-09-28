@@ -38,6 +38,11 @@ public final class CardPanel {
             return mouseX >= this.x && mouseX < this.x + this.width
                     && mouseY >= this.y && mouseY < this.y + this.height;
         }
+
+        public boolean intersects(int x, int y, int width, int height) {
+            return x < this.x + this.width && x + width > this.x
+                    && y < this.y + this.height && y + height > this.y;
+        }
     }
 
     /**

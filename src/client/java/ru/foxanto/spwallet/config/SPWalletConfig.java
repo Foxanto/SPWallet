@@ -6,6 +6,7 @@ import dev.isxander.yacl3.config.v2.api.SerialEntry;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import ru.foxanto.spwallet.SPWallet;
+import ru.foxanto.spwallet.util.PaymentSound;
 
 public class SPWalletConfig {
     public static final ConfigClassHandler<SPWalletConfig> HANDLER = ConfigClassHandler.createBuilder(SPWalletConfig.class)
@@ -43,6 +44,42 @@ public class SPWalletConfig {
     @SerialEntry
     public boolean paymentSound = true;
 
+    /**
+     * Which sound that is, as {@link ru.foxanto.spwallet.util.PaymentSound} saves it: a sound event,
+     * an {@code .ogg} from a resource pack or a file from the audios folder.
+     */
+    @SerialEntry
+    public String paymentSoundChoice = PaymentSound.DEFAULT;
+
+    /** How loud the mod's sounds are, from 0 to 1. */
+    @SerialEntry
+    public float paymentSoundVolume = 0.8F;
+
+    /**
+     * Show a notification when a card's balance goes up. A stopgap until the SPWorlds API can list
+     * transactions: the mod checks the balances once a minute and reports any rise.
+     */
+    @SerialEntry
+    public boolean incomingNotifications = true;
+
+    /** Play a sound with that notification. */
+    @SerialEntry
+    public boolean incomingSound = true;
+
+    /** Which sound, saved the same way as {@link #paymentSoundChoice}. */
+    @SerialEntry
+    public String incomingSoundChoice = PaymentSound.DEFAULT_INCOMING;
+
+    /**
+     * Where the notifications appear, as a fraction of the free room like {@link #hudX}: the bottom
+     * left corner by default.
+     */
+    @SerialEntry
+    public float notificationX = 0;
+
+    @SerialEntry
+    public float notificationY = 1;
+
     /** Which palette the mod's screens and panels are drawn in. */
     @SerialEntry
     public Theme theme = Theme.DARK;
@@ -68,6 +105,16 @@ public class SPWalletConfig {
     /** Which side of the inventory that panel is on. */
     @SerialEntry
     public PanelSide inventoryPanelSide = PanelSide.RIGHT;
+
+    /**
+     * Where the inventory panel sits when it was dragged ({@link PanelSide#FREE}), as a fraction of
+     * the free room across and down the screen, like {@link #hudX} and {@link #hudY}.
+     */
+    @SerialEntry
+    public float inventoryPanelX = 1;
+
+    @SerialEntry
+    public float inventoryPanelY = 0;
 
     /**
      * Force GUI scale 2 while the wallet is open, like SPWorlds Pay did. The screen is laid out for

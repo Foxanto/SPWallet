@@ -60,11 +60,19 @@ public final class BalanceHud {
      * changes and the panel can never end up off screen.
      */
     public static int x(int width, int screenWidth) {
-        return MARGIN + Math.round(SPWalletConfig.get().hudX * room(width, screenWidth));
+        return position(SPWalletConfig.get().hudX, width, screenWidth);
     }
 
     public static int y(int height, int screenHeight) {
-        return MARGIN + Math.round(SPWalletConfig.get().hudY * room(height, screenHeight));
+        return position(SPWalletConfig.get().hudY, height, screenHeight);
+    }
+
+    /**
+     * Where a panel edge goes for a saved {@code fraction} of the room. Shared with the inventory
+     * panel, whose dragged position is saved the same way.
+     */
+    public static int position(float fraction, int size, int screenSize) {
+        return MARGIN + Math.round(fraction * room(size, screenSize));
     }
 
     /** The inverse of {@link #x}/{@link #y}: the fraction a panel edge at {@code position} is at. */

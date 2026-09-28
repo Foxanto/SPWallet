@@ -3,14 +3,27 @@
   "id": "spwallet",
   "version": "${version}",
   "name": "SPWallet",
-  "description": "предоставляет игрокам удобный инструмент для работы с платежными картами СП/СПм прямо в игре Minecraft. Теперь вам не нужно покидать сервер для проведения финансовых операций - все необходимые функции доступны в игровом интерфейсе.",
+  "description": "SPWallet - удобная платёжная система для игроков СП/СПм #SPWallet",
   "authors": [
-    "Foxanto"
+    {
+      "name": "Foxanto (Developer)",
+      "contact": {
+        "homepage": "https://github.com/Foxanto"
+      }
+    },
+    "DaPoT22 (Idea generator)"
   ],
   "contributors": [
+    {
+      "name": "ashleybrimstone (Artist)",
+      "telegram": "https://t.me/TheBrimstoneArts"
+    },
+    "Furrc (SPWorlds Pay, the mod SPWallet continues)",
     "MeiNanziiii (SPWorlds Pay, the mod SPWallet continues)"
   ],
-  "contact": {},
+  "contact": {
+    "sources": "https://github.com/Foxanto/SPWallet"
+  },
   "license": "All-Rights-Reserved",
   "icon": "assets/spwallet/icon.png",
   "environment": "client",
