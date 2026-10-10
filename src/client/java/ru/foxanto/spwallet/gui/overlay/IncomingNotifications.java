@@ -6,6 +6,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import ru.foxanto.spwallet.config.AmountFormat;
 import ru.foxanto.spwallet.api.CardColor;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.gui.EssentialColors;
@@ -188,10 +189,10 @@ public final class IncomingNotifications {
     }
 
     private static Component amount(Entry entry) {
-        return Component.translatable("gui.spwallet.notification.amount", entry.amount());
+        return Component.translatable("gui.spwallet.notification.amount", AmountFormat.card(entry.amount()));
     }
 
     private static Component balance(Entry entry) {
-        return Component.translatable("gui.spwallet.notification.balance", entry.balance());
+        return Component.translatable("gui.spwallet.notification.balance", AmountFormat.card(entry.balance()));
     }
 }

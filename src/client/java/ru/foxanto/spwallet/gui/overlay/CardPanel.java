@@ -4,6 +4,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import ru.foxanto.spwallet.config.AmountFormat;
 import ru.foxanto.spwallet.gui.EssentialColors;
 import ru.foxanto.spwallet.util.CardInfoCache.Row;
 
@@ -175,7 +176,7 @@ public final class CardPanel {
 
     private static Component balance(Row row) {
         if (row.balance() != null) {
-            return Component.translatable("gui.spwallet.panel.balance", row.balance());
+            return AmountFormat.card(row.balance());
         }
 
         return Component.literal(row.failed() ? "—" : "…");

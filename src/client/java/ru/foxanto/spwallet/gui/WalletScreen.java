@@ -17,6 +17,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import ru.foxanto.spwallet.config.AmountFormat;
 import ru.foxanto.spwallet.SPWallet;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.api.CardNumber;
@@ -582,12 +583,13 @@ public class WalletScreen extends EssentialScreen {
                     MessageScreen.open(
                         Component.translatable("gui.spwallet.title.success"),
                         Component.translatable("gui.spwallet.description.successfully_sent")
-                                .append(card.name() + " " + value)
+                                .append(card.name() + " ")
+                                .append(AmountFormat.card(value))
                                 .append(Component.translatable("gui.spwallet.description.diamonds_to_the_card"))
                                 .append(receiver)
                                 .append("\n")
                                 .append(Component.translatable("gui.spwallet.description.balance"))
-                                .append(String.valueOf(newBalance)));
+                                .append(AmountFormat.card(newBalance)));
                 }, client)
                 .exceptionallyAsync(throwable -> {
                     MessageScreen.open(

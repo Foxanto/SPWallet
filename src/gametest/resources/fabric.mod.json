@@ -9,7 +9,8 @@
     "fabric-client-gametest": [
       "ru.foxanto.spwallet.gametest.ScreenGameTest",
       "ru.foxanto.spwallet.gametest.OverlayGameTest",
-      "ru.foxanto.spwallet.gametest.SoundGameTest"
+      "ru.foxanto.spwallet.gametest.SoundGameTest",
+      "ru.foxanto.spwallet.gametest.OreCounterGameTest"
     ]
   },
   "depends": {

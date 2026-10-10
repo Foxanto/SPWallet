@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import ru.foxanto.spwallet.SPWallet;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.api.SPWorldsApi;
+import ru.foxanto.spwallet.config.AmountFormat;
 import ru.foxanto.spwallet.gui.EssentialColors;
 import ru.foxanto.spwallet.util.CardInfoCache;
 
@@ -25,7 +26,7 @@ public class CardBalanceLabel extends LabelComponent {
                     // still noticed instead of quietly becoming the new baseline.
                     CardInfoCache.balanceFetched(card, balance, requestedAt);
                     this.text(Component.translatable("gui.spwallet.description.balance")
-                            .append(String.valueOf(balance)));
+                            .append(AmountFormat.card(balance)));
                 }, client)
                 .exceptionallyAsync(throwable -> {
                     SPWallet.LOGGER.warn("Could not read the balance of card {}", card.id(), throwable);

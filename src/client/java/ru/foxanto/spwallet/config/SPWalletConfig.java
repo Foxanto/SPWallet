@@ -92,6 +92,14 @@ public class SPWalletConfig {
     @SerialEntry
     public Theme theme = Theme.DARK;
 
+    /** How card balances and transfer amounts are written: in stacks of 64 (the default) or as one number. */
+    @SerialEntry
+    public AmountFormat cardAmountFormat = AmountFormat.STACKS;
+
+    /** How the counted ore is written, apart from the cards: in stacks of 64 (the default) or as one number. */
+    @SerialEntry
+    public AmountFormat oreAmountFormat = AmountFormat.STACKS;
+
     /** Show the balances of the saved cards on the HUD. */
     @SerialEntry
     public boolean hudEnabled = true;
@@ -123,6 +131,32 @@ public class SPWalletConfig {
 
     @SerialEntry
     public float inventoryPanelY = 0;
+
+    /** Show a panel counting the diamond ore (АР) in the inventory and its shulker boxes. */
+    @SerialEntry
+    public boolean oreCounter = true;
+
+    /** Add the АР a shulker box holds to its tooltip. */
+    @SerialEntry
+    public boolean oreTooltip = true;
+
+    /** Hide that panel while there is no ore to count. */
+    @SerialEntry
+    public boolean orePanelHideEmpty = false;
+
+    /**
+     * Which side of the inventory the ore panel is on. It shares the right with the card panel by
+     * default and stacks under it, since the left is where the recipe book opens.
+     */
+    @SerialEntry
+    public PanelSide orePanelSide = PanelSide.RIGHT;
+
+    /** Where the ore panel sits when it was dragged, like {@link #inventoryPanelX}. */
+    @SerialEntry
+    public float orePanelX = 1;
+
+    @SerialEntry
+    public float orePanelY = 1;
 
     /**
      * Force GUI scale 2 while the wallet is open, like SPWorlds Pay did. The screen is laid out for

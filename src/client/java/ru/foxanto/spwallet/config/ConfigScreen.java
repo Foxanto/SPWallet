@@ -116,6 +116,17 @@ public final class ConfigScreen {
                                                 .enumClass(Theme.class)
                                                 .formatValue(Theme::label))
                                         .build())
+                                .option(Option.<AmountFormat>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.card_amount_format"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.card_amount_format.description")))
+                                        .binding(defaults.cardAmountFormat,
+                                                () -> config.cardAmountFormat,
+                                                value -> config.cardAmountFormat = value)
+                                        .controller(option -> EnumControllerBuilder.create(option)
+                                                .enumClass(AmountFormat.class)
+                                                .formatValue(AmountFormat::label))
+                                        .build())
                                 .option(toggle("hud_enabled", defaults.hudEnabled,
                                         () -> config.hudEnabled,
                                         value -> config.hudEnabled = value))
@@ -136,6 +147,37 @@ public final class ConfigScreen {
                                         .binding(defaults.inventoryPanelSide,
                                                 () -> config.inventoryPanelSide,
                                                 value -> config.inventoryPanelSide = value)
+                                        .controller(option -> EnumControllerBuilder.create(option)
+                                                .enumClass(PanelSide.class)
+                                                .formatValue(PanelSide::label))
+                                        .build())
+                                .option(toggle("ore_counter", defaults.oreCounter,
+                                        () -> config.oreCounter,
+                                        value -> config.oreCounter = value))
+                                .option(Option.<AmountFormat>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.ore_amount_format"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.ore_amount_format.description")))
+                                        .binding(defaults.oreAmountFormat,
+                                                () -> config.oreAmountFormat,
+                                                value -> config.oreAmountFormat = value)
+                                        .controller(option -> EnumControllerBuilder.create(option)
+                                                .enumClass(AmountFormat.class)
+                                                .formatValue(AmountFormat::label))
+                                        .build())
+                                .option(toggle("ore_tooltip", defaults.oreTooltip,
+                                        () -> config.oreTooltip,
+                                        value -> config.oreTooltip = value))
+                                .option(toggle("ore_panel_hide_empty", defaults.orePanelHideEmpty,
+                                        () -> config.orePanelHideEmpty,
+                                        value -> config.orePanelHideEmpty = value))
+                                .option(Option.<PanelSide>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.ore_panel_side"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.ore_panel_side.description")))
+                                        .binding(defaults.orePanelSide,
+                                                () -> config.orePanelSide,
+                                                value -> config.orePanelSide = value)
                                         .controller(option -> EnumControllerBuilder.create(option)
                                                 .enumClass(PanelSide.class)
                                                 .formatValue(PanelSide::label))

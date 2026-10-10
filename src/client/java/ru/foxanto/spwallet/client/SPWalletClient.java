@@ -24,6 +24,7 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 import ru.foxanto.spwallet.SPWallet;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.commands.APICommand;
+import ru.foxanto.spwallet.commands.AddCardCommand;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.gui.AddCardScreen;
 import ru.foxanto.spwallet.gui.MessageScreen;
@@ -31,6 +32,7 @@ import ru.foxanto.spwallet.gui.WalletScreen;
 import ru.foxanto.spwallet.gui.overlay.BalanceHud;
 import ru.foxanto.spwallet.gui.overlay.IncomingNotifications;
 import ru.foxanto.spwallet.gui.overlay.InventoryCardPanel;
+import ru.foxanto.spwallet.gui.overlay.OrePanel;
 import ru.foxanto.spwallet.storage.CardStorage;
 import ru.foxanto.spwallet.util.CardInfoCache;
 import ru.foxanto.spwallet.util.PaymentSound;
@@ -75,9 +77,11 @@ public class SPWalletClient implements ClientModInitializer {
         cards = new CardStorage();
         PaymentSound.createFolder();
 
-        // Client command: handled locally, never sent to the Minecraft server.
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
-                APICommand.register(dispatcher));
+        // Client commands: handled locally, never sent to the Minecraft server.
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            APICommand.register(dispatcher);
+            AddCardCommand.register(dispatcher);
+        });
 
         openWalletKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.spwallet.open_wallet_screen",
@@ -105,6 +109,7 @@ public class SPWalletClient implements ClientModInitializer {
         HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, SPWallet.id("incoming"),
                 IncomingNotifications::render);
         InventoryCardPanel.register();
+        OrePanel.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(SPWalletClient::onEndTick);
         UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
