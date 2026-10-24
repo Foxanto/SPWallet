@@ -4,6 +4,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import ru.foxanto.spwallet.api.ApiStatus;
 import ru.foxanto.spwallet.config.AmountFormat;
 import ru.foxanto.spwallet.gui.EssentialColors;
 import ru.foxanto.spwallet.util.CardInfoCache.Row;
@@ -14,6 +15,9 @@ import java.util.List;
 /**
  * Draws a list of cards as a small panel: a colour strip, the name, optionally the number, and the
  * balance on the right. The HUD, the inventory and the HUD position editor all draw it the same way.
+ *
+ * <p>While the API is slow or down a line under the cards says so (see {@link ApiStatus#problem()}),
+ * so a balance that stopped updating is not taken for the real one.
  *
  * <p>Plain {@link GuiGraphics} calls rather than owo components: the HUD has no screen to host a
  * component tree, and the panel is simple enough not to need one.
@@ -32,6 +36,9 @@ public final class CardPanel {
     private static final String FAVOURITE = "★";
     private static final String NOT_FAVOURITE = "☆";
     private static final int FAVOURITE_GAP = 4;
+
+    private static final String STATUS_MARK = "●";
+    private static final int STATUS_GAP = 4;
 
     /** A rectangle on screen, for whoever has to tell whether it was clicked. */
     public record Bounds(int x, int y, int width, int height) {
@@ -74,6 +81,12 @@ public final class CardPanel {
             content = Math.max(content, font.width(style.header()) + COLUMN_GAP + style.headerReserve());
         }
 
+        Component status = ApiStatus.problem();
+
+        if (status != null) {
+            content = Math.max(content, statusWidth(font, status));
+        }
+
         return content + PADDING * 2;
     }
 
@@ -82,6 +95,10 @@ public final class CardPanel {
 
         if (style.header() != null) {
             content += HEADER_HEIGHT;
+        }
+
+        if (ApiStatus.problem() != null) {
+            content += ROW_GAP + ROW_HEIGHT;
         }
 
         return content + PADDING * 2;
@@ -153,7 +170,20 @@ public final class CardPanel {
             top += ROW_HEIGHT + ROW_GAP;
         }
 
+        Component status = ApiStatus.problem();
+
+        if (status != null) {
+            graphics.drawString(font, STATUS_MARK, x + PADDING, top,
+                    EssentialColors.apiStatus(ApiStatus.state()), EssentialColors.textShadow());
+            graphics.drawString(font, status, x + PADDING + font.width(STATUS_MARK) + STATUS_GAP, top,
+                    EssentialColors.cardBalance(), EssentialColors.textShadow());
+        }
+
         return bounds;
+    }
+
+    private static int statusWidth(Font font, Component status) {
+        return font.width(STATUS_MARK) + STATUS_GAP + font.width(status);
     }
 
     /** Room taken by the star column, which the two marks share so rows never shift about. */
@@ -179,6 +209,12 @@ public final class CardPanel {
             return AmountFormat.card(row.balance());
         }
 
-        return Component.literal(row.failed() ? "—" : "…");
+        if (row.failure() == null) {
+            return Component.literal("…");
+        }
+
+        // The status line under the cards already says what is wrong with the API; only a card's
+        // own trouble, such as a bad token, needs saying on its row.
+        return row.failure().apiWide() ? Component.literal("—") : row.failure().shortDescription();
     }
 }

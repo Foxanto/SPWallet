@@ -260,8 +260,8 @@ public class HudPositionScreen extends Screen {
     private static List<Row> placeholder() {
         return List.of(
                 new Row("", Component.translatable("gui.spwallet.panel.example_card").getString(),
-                        1337, false, null, CardColor.BLUE.argb(), true),
+                        1337, null, null, CardColor.BLUE.argb(), true),
                 new Row("", Component.translatable("gui.spwallet.panel.example_card_2").getString(),
-                        64, false, null, CardColor.YELLOW.argb(), true));
+                        64, null, null, CardColor.YELLOW.argb(), true));
     }
 }

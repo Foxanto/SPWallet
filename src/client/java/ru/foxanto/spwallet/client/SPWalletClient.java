@@ -34,6 +34,8 @@ import ru.foxanto.spwallet.gui.overlay.IncomingNotifications;
 import ru.foxanto.spwallet.gui.overlay.InventoryCardPanel;
 import ru.foxanto.spwallet.gui.overlay.OrePanel;
 import ru.foxanto.spwallet.storage.CardStorage;
+import ru.foxanto.spwallet.storage.HistoryStorage;
+import ru.foxanto.spwallet.storage.TemplateStorage;
 import ru.foxanto.spwallet.util.CardInfoCache;
 import ru.foxanto.spwallet.util.PaymentSound;
 import ru.foxanto.spwallet.util.QrScanner;
@@ -62,19 +64,34 @@ public class SPWalletClient implements ClientModInitializer {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(SPWallet.id("wallet"));
 
     private static CardStorage cards;
+    private static HistoryStorage history;
+    private static TemplateStorage templates;
     private static KeyMapping openWalletKey;
     private static KeyMapping interactKey;
     private static KeyMapping scanQrKey;
+    private static KeyMapping doNotDisturbKey;
 
     /** The player's saved cards. */
     public static CardStorage cards() {
         return cards;
     }
 
+    /** The operations the mod has seen. */
+    public static HistoryStorage history() {
+        return history;
+    }
+
+    /** The player's saved payments. */
+    public static TemplateStorage templates() {
+        return templates;
+    }
+
     @Override
     public void onInitializeClient() {
         SPWalletConfig.load();
         cards = new CardStorage();
+        history = new HistoryStorage();
+        templates = new TemplateStorage();
         PaymentSound.createFolder();
 
         // Client commands: handled locally, never sent to the Minecraft server.
@@ -98,6 +115,13 @@ public class SPWalletClient implements ClientModInitializer {
         // Unbound by default: a map in a frame is scanned by clicking it, this is for the rest.
         scanQrKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.spwallet.scan_qr",
+                InputConstants.Type.KEYSYM,
+                InputConstants.UNKNOWN.getValue(),
+                CATEGORY));
+
+        // Unbound by default too: any free key will do, and none is free on every setup.
+        doNotDisturbKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.spwallet.do_not_disturb",
                 InputConstants.Type.KEYSYM,
                 InputConstants.UNKNOWN.getValue(),
                 CATEGORY));
@@ -189,6 +213,14 @@ public class SPWalletClient implements ClientModInitializer {
 
     private static void onEndTick(Minecraft client) {
         CardInfoCache.pollBalances();
+
+        while (doNotDisturbKey.consumeClick()) {
+            boolean on = !SPWalletConfig.get().doNotDisturb;
+            IncomingNotifications.doNotDisturb(on);
+            client.gui.setOverlayMessage(Component.translatable(on
+                    ? "gui.spwallet.do_not_disturb.on"
+                    : "gui.spwallet.do_not_disturb.off"), false);
+        }
 
         while (scanQrKey.consumeClick()) {
             if (SPWalletConfig.get().qrPayments) {

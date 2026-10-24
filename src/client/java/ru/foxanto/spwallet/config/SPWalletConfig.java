@@ -40,6 +40,13 @@ public class SPWalletConfig {
     @SerialEntry
     public boolean qrPayments = true;
 
+    /**
+     * Ask before sending a transfer of more than this many АР; {@code 0} never asks. Five stacks by
+     * default: more than a typo usually costs, less than most real purchases.
+     */
+    @SerialEntry
+    public int confirmTransferAbove = 5 * AmountFormat.STACK;
+
     /** Play a chime when a transfer goes through. */
     @SerialEntry
     public boolean paymentSound = true;
@@ -69,6 +76,21 @@ public class SPWalletConfig {
      */
     @SerialEntry
     public int incomingCheckSeconds = 5;
+
+    /**
+     * Do not disturb: no popups, sounds or chat lines for incoming money. What comes in meanwhile is
+     * summed up per card and shown once this is turned off. Kept across restarts, like a phone's.
+     */
+    @SerialEntry
+    public boolean doNotDisturb = false;
+
+    /** Money coming in below this many АР is not announced; it still goes into the journal. */
+    @SerialEntry
+    public int incomingMinAmount = 0;
+
+    /** Also put each incoming money notification into the chat, where it stays. */
+    @SerialEntry
+    public boolean incomingToChat = false;
 
     /** Play a sound with that notification. */
     @SerialEntry
@@ -164,6 +186,10 @@ public class SPWalletConfig {
      */
     @SerialEntry
     public boolean forceGuiScale = true;
+
+    /** Hide the wallet's side column with the templates and the journal; the arrow in its header toggles it. */
+    @SerialEntry
+    public boolean sidePanelCollapsed = false;
 
     public static SPWalletConfig get() {
         return HANDLER.instance();

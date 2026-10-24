@@ -165,14 +165,32 @@ public final class SPWorldsApi {
                         : HttpRequest.BodyPublishers.ofString(body))
                 .build();
 
+        long sentAt = System.currentTimeMillis();
+
         return HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .handle((response, throwable) -> {
+                    long now = System.currentTimeMillis();
+
                     if (throwable != null) {
+                        ApiStatus.unreachable(now);
                         throw new ApiException(throwable.getMessage(), throwable);
                     }
 
+                    ApiStatus.answered(response.statusCode(), now - sentAt, retryAfterMs(response), now);
                     return new RawResponse(response.statusCode(), response.body());
                 });
+    }
+
+    /** What {@code Retry-After} asks for, in milliseconds; only the seconds form is understood. */
+    private static long retryAfterMs(HttpResponse<?> response) {
+        try {
+            return response.headers().firstValue("Retry-After")
+                    .map(value -> Long.parseLong(value.trim()) * 1000)
+                    .orElse(0L);
+        } catch (NumberFormatException e) {
+            // An HTTP date, which the API is not known to send; the usual back-off will do.
+            return 0;
+        }
     }
 
     private static CompletableFuture<JsonObject> request(Card card, String endpoint, String method, String body) {
@@ -186,6 +204,7 @@ public final class SPWorldsApi {
 
     private static CompletableFuture<JsonElement> requestJson(Card card, String endpoint, String method, String body) {
         if (DebugData.enabled()) {
+            ApiStatus.answered(200, 0, 0, System.currentTimeMillis());
             return CompletableFuture.completedFuture(stubResponse(endpoint));
         }
 
@@ -198,7 +217,7 @@ public final class SPWorldsApi {
         try {
             json = GSON.fromJson(response.body(), JsonElement.class);
         } catch (JsonSyntaxException e) {
-            throw new ApiException("Malformed response (HTTP " + response.status() + ")", e);
+            throw new ApiException("Malformed response (HTTP " + response.status() + ")", response.status(), e);
         }
 
         if (response.status() / 100 != 2) {
@@ -208,7 +227,7 @@ public final class SPWorldsApi {
                     ? json.getAsJsonObject().get("message").getAsString()
                     : "HTTP " + response.status();
 
-            throw new ApiException(message);
+            throw new ApiException(message, response.status());
         }
 
         if (json == null || json.isJsonNull()) {

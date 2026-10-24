@@ -5,6 +5,7 @@ import io.wispforest.owo.ui.core.Color;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import ru.foxanto.spwallet.SPWallet;
+import ru.foxanto.spwallet.api.ApiException;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.api.SPWorldsApi;
 import ru.foxanto.spwallet.config.AmountFormat;
@@ -29,9 +30,11 @@ public class CardBalanceLabel extends LabelComponent {
                             .append(AmountFormat.card(balance)));
                 }, client)
                 .exceptionallyAsync(throwable -> {
-                    SPWallet.LOGGER.warn("Could not read the balance of card {}", card.id(), throwable);
+                    SPWallet.LOGGER.warn("Could not read the balance of card {}: {}", card.id(),
+                            ApiException.messageOf(throwable));
 
-                    this.text(Component.translatable("gui.spwallet.description.balance_error"));
+                    this.text(Component.translatable("gui.spwallet.description.balance")
+                            .append(ApiException.kindOf(throwable).description()));
                     this.color(Color.ofArgb(EssentialColors.error()));
 
                     return null;

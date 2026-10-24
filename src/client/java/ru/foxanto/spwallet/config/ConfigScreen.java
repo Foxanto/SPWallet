@@ -9,10 +9,12 @@ import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
 import dev.isxander.yacl3.api.controller.FloatSliderControllerBuilder;
+import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import ru.foxanto.spwallet.gui.overlay.IncomingNotifications;
 import ru.foxanto.spwallet.gui.HudPositionScreen;
 import ru.foxanto.spwallet.gui.SoundPickerScreen;
 import ru.foxanto.spwallet.util.PaymentSound;
@@ -46,6 +48,18 @@ public final class ConfigScreen {
                                 .option(toggle("qr_payments", defaults.qrPayments,
                                         () -> config.qrPayments,
                                         value -> config.qrPayments = value))
+                                .option(Option.<Integer>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.confirm_transfer_above"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.confirm_transfer_above.description")))
+                                        .binding(defaults.confirmTransferAbove,
+                                                () -> config.confirmTransferAbove,
+                                                value -> config.confirmTransferAbove = value)
+                                        // A plain number: the field parses back whatever it shows,
+                                        // so "5 ст." would not survive being edited.
+                                        .controller(option -> IntegerFieldControllerBuilder.create(option)
+                                                .range(0, AmountFormat.MAX_AMOUNT))
+                                        .build())
                                 .option(toggle("payment_sound", defaults.paymentSound,
                                         () -> config.paymentSound,
                                         value -> config.paymentSound = value))
@@ -92,6 +106,22 @@ public final class ConfigScreen {
                                                 .formatValue(value -> Component.translatable(
                                                         "config.spwallet.option.incoming_check_seconds.value", value)))
                                         .build())
+                                .option(toggle("do_not_disturb", defaults.doNotDisturb,
+                                        () -> config.doNotDisturb,
+                                        IncomingNotifications::doNotDisturb))
+                                .option(Option.<Integer>createBuilder()
+                                        .name(Component.translatable("config.spwallet.option.incoming_min_amount"))
+                                        .description(OptionDescription.of(Component.translatable(
+                                                "config.spwallet.option.incoming_min_amount.description")))
+                                        .binding(defaults.incomingMinAmount,
+                                                () -> config.incomingMinAmount,
+                                                value -> config.incomingMinAmount = value)
+                                        .controller(option -> IntegerFieldControllerBuilder.create(option)
+                                                .range(0, AmountFormat.MAX_AMOUNT))
+                                        .build())
+                                .option(toggle("incoming_to_chat", defaults.incomingToChat,
+                                        () -> config.incomingToChat,
+                                        value -> config.incomingToChat = value))
                                 .option(toggle("incoming_sound", defaults.incomingSound,
                                         () -> config.incomingSound,
                                         value -> config.incomingSound = value))

@@ -10,7 +10,13 @@
       "ru.foxanto.spwallet.gametest.ScreenGameTest",
       "ru.foxanto.spwallet.gametest.OverlayGameTest",
       "ru.foxanto.spwallet.gametest.SoundGameTest",
-      "ru.foxanto.spwallet.gametest.OreCounterGameTest"
+      "ru.foxanto.spwallet.gametest.OreCounterGameTest",
+      "ru.foxanto.spwallet.gametest.ApiStatusGameTest",
+      "ru.foxanto.spwallet.gametest.AmountGameTest",
+      "ru.foxanto.spwallet.gametest.HistoryGameTest",
+      "ru.foxanto.spwallet.gametest.TemplateGameTest",
+      "ru.foxanto.spwallet.gametest.QuietGameTest",
+      "ru.foxanto.spwallet.gametest.SideColumnGameTest"
     ]
   },
   "depends": {

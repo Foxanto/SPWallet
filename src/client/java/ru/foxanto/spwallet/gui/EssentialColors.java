@@ -1,5 +1,6 @@
 package ru.foxanto.spwallet.gui;
 
+import ru.foxanto.spwallet.api.ApiStatus;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.config.Theme;
 
@@ -32,7 +33,7 @@ public final class EssentialColors {
                            int screenTitle, int modalText,
                            int tabText, int tabTextHovered, int tabTextSelected,
                            int inputText, int inputPlaceholder,
-                           int cardBalance, int scrollbar, int error,
+                           int cardBalance, int scrollbar, int error, int success, int warning,
                            int buttonText, int accentButtonText,
                            int buttonTextDisabled, int flatButtonTextDisabled) {}
 
@@ -42,7 +43,7 @@ public final class EssentialColors {
             0xFFE5E5E5, 0xFFE2E2E2,
             0xFFBDBDBD, 0xFFE2E2E2, 0xFF2995FC,
             0xFFE2E2E2, 0xFFBFBFBF,
-            0xFF747474, 0xFF5C5C5C, 0xFFFF3333,
+            0xFF747474, 0xFF5C5C5C, 0xFFFF3333, 0xFF4CC26A, 0xFFE5A50A,
             0xFFE2E2E2, 0xFFE2E2E2,
             0xFFA0A0A0, 0xFFBFBFBF);
 
@@ -54,7 +55,7 @@ public final class EssentialColors {
             0xFF000000, 0xFF000000,
             0xFF2E2E2E, 0xFF000000, 0xFF0D5FB3,
             0xFF000000, 0xFF505050,
-            0xFF383838, 0xFF8A8A8A, 0xFFB71C1C,
+            0xFF383838, 0xFF8A8A8A, 0xFFB71C1C, 0xFF1E7B34, 0xFF9A6700,
             0xFF000000, 0xFFF2F2F2,
             0xFF666666, 0xFF5E5E5E);
 
@@ -135,6 +136,24 @@ public final class EssentialColors {
 
     public static int error() {
         return palette().error();
+    }
+
+    public static int success() {
+        return palette().success();
+    }
+
+    public static int warning() {
+        return palette().warning();
+    }
+
+    /** The colour of the API status mark: green, amber or red, grey before anything was asked. */
+    public static int apiStatus(ApiStatus.State state) {
+        return switch (state) {
+            case UNKNOWN -> cardBalance();
+            case OK -> success();
+            case SLOW -> warning();
+            case DOWN -> error();
+        };
     }
 
     public static int buttonText() {
