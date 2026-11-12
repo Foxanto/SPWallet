@@ -240,5 +240,19 @@
   "gui.spwallet.notification.outgoing": "Перевод: %s → %s",
   "gui.spwallet.notification.amount_out": "−%s",
   "gui.spwallet.side.hide": "Скрыть шаблоны и журнал",
-  "gui.spwallet.side.show": "Показать шаблоны и журнал"
+  "gui.spwallet.side.show": "Показать шаблоны и журнал",
+  "config.spwallet.category.about": "О нас",
+  "config.spwallet.about.group.mod": "О моде",
+  "config.spwallet.about.group.authors": "Авторы",
+  "config.spwallet.about.group.contributors": "Участники",
+  "config.spwallet.about.license": "Лицензия: %s",
+  "config.spwallet.about.contact.homepage": "Сайт",
+  "config.spwallet.about.contact.sources": "Исходный код",
+  "config.spwallet.about.contact.issues": "Сообщить о проблеме",
+  "config.spwallet.about.contact.modrinth": "Modrinth",
+  "config.spwallet.about.contact.telegram": "Telegram",
+  "config.spwallet.about.contact.discord": "Discord",
+  "config.spwallet.about.role.developer": "разработчик",
+  "config.spwallet.about.role.idea_generator": "генератор идей",
+  "config.spwallet.about.role.spworlds_pay_the_mod_spwallet_continues": "автор SPWorlds Pay, продолжением которого стал SPWallet"
 }

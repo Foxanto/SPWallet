@@ -240,5 +240,19 @@
   "gui.spwallet.notification.outgoing": "Sent: %s → %s",
   "gui.spwallet.notification.amount_out": "−%s",
   "gui.spwallet.side.hide": "Hide templates and history",
-  "gui.spwallet.side.show": "Show templates and history"
+  "gui.spwallet.side.show": "Show templates and history",
+  "config.spwallet.category.about": "About",
+  "config.spwallet.about.group.mod": "About the mod",
+  "config.spwallet.about.group.authors": "Authors",
+  "config.spwallet.about.group.contributors": "Contributors",
+  "config.spwallet.about.license": "License: %s",
+  "config.spwallet.about.contact.homepage": "Homepage",
+  "config.spwallet.about.contact.sources": "Source code",
+  "config.spwallet.about.contact.issues": "Report an issue",
+  "config.spwallet.about.contact.modrinth": "Modrinth",
+  "config.spwallet.about.contact.telegram": "Telegram",
+  "config.spwallet.about.contact.discord": "Discord",
+  "config.spwallet.about.role.developer": "developer",
+  "config.spwallet.about.role.idea_generator": "idea generator",
+  "config.spwallet.about.role.spworlds_pay_the_mod_spwallet_continues": "SPWorlds Pay, the mod SPWallet continues"
 }

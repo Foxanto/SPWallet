@@ -214,6 +214,7 @@ public final class ConfigScreen {
                                         .build())
                                 .build())
                         .build())
+                .category(AboutCategory.create())
                 .save(SPWalletConfig.HANDLER::save)
                 .build()
                 .generateScreen(parent);
