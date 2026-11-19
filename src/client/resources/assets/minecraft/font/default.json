@@ -17,6 +17,15 @@
       "chars": [
         "\uD83D\uDCBE"
       ]
+    },
+    {
+      "type": "bitmap",
+      "file": "spwallet:icon/call.png",
+      "height": 9,
+      "ascent": 8,
+      "chars": [
+        "\uD83D\uDCDE"
+      ]
     }
   ]
 }

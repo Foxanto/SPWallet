@@ -85,6 +85,9 @@ public final class ConfigScreen {
                                 .option(toggle("force_gui_scale", defaults.forceGuiScale,
                                         () -> config.forceGuiScale,
                                         value -> config.forceGuiScale = value))
+                                .option(toggle("auto_update", defaults.autoUpdate,
+                                        () -> config.autoUpdate,
+                                        value -> config.autoUpdate = value))
                                 .build())
                         .group(OptionGroup.createBuilder()
                                 .name(Component.translatable("config.spwallet.group.incoming"))
@@ -212,6 +215,20 @@ public final class ConfigScreen {
                                                 .enumClass(PanelSide.class)
                                                 .formatValue(PanelSide::label))
                                         .build())
+                                .build())
+                        .group(OptionGroup.createBuilder()
+                                .name(Component.translatable("config.spwallet.group.connect"))
+                                .description(OptionDescription.of(Component.translatable(
+                                        "config.spwallet.group.connect.description")))
+                                .option(toggle("connect_enabled", defaults.connectEnabled,
+                                        () -> config.connectEnabled,
+                                        value -> config.connectEnabled = value))
+                                .option(toggle("connect_toasts", defaults.connectToasts,
+                                        () -> config.connectToasts,
+                                        value -> config.connectToasts = value))
+                                .option(toggle("connect_sound", defaults.connectSound,
+                                        () -> config.connectSound,
+                                        value -> config.connectSound = value))
                                 .build())
                         .build())
                 .category(AboutCategory.create())

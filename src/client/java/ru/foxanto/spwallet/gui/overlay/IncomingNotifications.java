@@ -37,16 +37,19 @@ import java.util.Map;
  * the journal keeps it whole. Neither setting holds those back: the player just sent it.
  */
 public final class IncomingNotifications {
-    private static final long SHOWN_MS = 6_000;
+    private static final long SHOWN_MS = 3_000;
     /** A summary covers more than one transfer, so it stays up longer. */
-    private static final long SUMMARY_SHOWN_MS = 12_000;
+    private static final long SUMMARY_SHOWN_MS = 6_000;
+    /** Minecraft's own green and red, for money in and money out. */
+    private static final int IN_COLOR = 0xFF55FF55;
+    private static final int OUT_COLOR = 0xFFFF5555;
     private static final long SLIDE_MS = 250;
     private static final int MAX_SHOWN = 4;
 
     private static final int PADDING = 4;
     private static final int STRIP_WIDTH = 2;
-    private static final int STRIP_GAP = 5;
-    private static final int LINE_GAP = 3;
+    private static final int STRIP_GAP = 4;
+    private static final int PART_GAP = 6;
     private static final int GAP = 3;
     /** How much of a comment a notification shows before cutting it off. */
     private static final int COMMENT_LENGTH = 7;
@@ -218,7 +221,8 @@ public final class IncomingNotifications {
         if (ENTRIES.isEmpty()
                 || client.options.hideGui
                 // The editor draws its own copy, which is the one being dragged.
-                || client.screen instanceof HudPositionScreen) {
+                || client.screen instanceof HudPositionScreen
+                || client.screen instanceof ru.foxanto.spwallet.gui.WalletScreen) {
             return;
         }
 
@@ -235,12 +239,70 @@ public final class IncomingNotifications {
                 CardColor.BLUE.argb(), 64, 1401, Source.LIVE, 1, null, null, Long.MIN_VALUE));
     }
 
+    /**
+     * Where the stack goes across the screen. Until the player moves it ({@link
+     * SPWalletConfig#notificationY} below zero) it hangs right under the favourite cards, lined up
+     * with them, as one block.
+     */
     public static int x(int width, int screenWidth) {
+        if (followsHud()) {
+            Minecraft client = Minecraft.getInstance();
+            int hudWidth = hudWidth(client.font);
+            int hudX = BalanceHud.x(hudWidth, screenWidth);
+            // Against the edge the cards are nearer to.
+            return hudX + hudWidth / 2 > screenWidth / 2 ? hudX + hudWidth - width : hudX;
+        }
+
         return BalanceHud.position(SPWalletConfig.get().notificationX, width, screenWidth);
     }
 
     public static int y(int height, int screenHeight) {
+        if (followsHud()) {
+            int hudHeight = hudHeight();
+            int hudY = BalanceHud.y(hudHeight, screenHeight);
+            if (hudHeight == 0) return hudY;
+            // Under the cards, or above them when they sit in the bottom half.
+            return hudY + hudHeight / 2 <= screenHeight / 2 ? hudY + hudHeight + GAP : hudY - height - GAP;
+        }
+
         return BalanceHud.position(SPWalletConfig.get().notificationY, height, screenHeight);
+    }
+
+    /**
+     * The y just under the favourite cards and the notifications hanging from them, for the call
+     * cards that go under both. With nothing there, the top of the screen.
+     */
+    public static int stackBottom(int screenWidth, int screenHeight) {
+        int hudHeight = hudHeight();
+        int bottom = hudHeight == 0 ? 0 : BalanceHud.y(hudHeight, screenHeight) + hudHeight;
+
+        if (followsHud() && !ENTRIES.isEmpty()) {
+            int height = height(ENTRIES);
+            bottom = Math.max(bottom, y(height, screenHeight) + height);
+        }
+
+        return Math.max(bottom, 1);
+    }
+
+    private static boolean followsHud() {
+        return SPWalletConfig.get().notificationY < 0;
+    }
+
+    /** The favourite cards on the HUD now, empty while there are none to show. */
+    private static List<ru.foxanto.spwallet.util.CardInfoCache.Row> hudRows() {
+        ru.foxanto.spwallet.util.SPServer server = ru.foxanto.spwallet.util.CardInfoCache.server();
+        if (server == null || !SPWalletConfig.get().hudEnabled) return List.of();
+        return ru.foxanto.spwallet.util.CardInfoCache.favouriteRows(server);
+    }
+
+    private static int hudWidth(Font font) {
+        List<ru.foxanto.spwallet.util.CardInfoCache.Row> rows = hudRows();
+        return rows.isEmpty() ? 0 : CardPanel.width(font, rows, BalanceHud.STYLE);
+    }
+
+    private static int hudHeight() {
+        List<ru.foxanto.spwallet.util.CardInfoCache.Row> rows = hudRows();
+        return rows.isEmpty() ? 0 : CardPanel.height(rows, BalanceHud.STYLE);
     }
 
     /** The width of the widest notification, which the whole stack is laid out by. */
@@ -297,31 +359,28 @@ public final class IncomingNotifications {
         return 1 - (1 - t) * (1 - t);
     }
 
+    /** One line in the HUD look: the card's strip, its name, the signed amount, then what else there is. */
     private static void drawEntry(GuiGraphics graphics, Font font, Entry entry, int x, int y, int width) {
         int height = entryHeight(entry);
-        graphics.fill(x, y, x + width, y + height, EssentialColors.hudBackground());
-        graphics.renderOutline(x, y, width, height, EssentialColors.border());
+        graphics.fill(x, y, x + width, y + height, CardPanel.HUD_BACKGROUND);
 
-        int color = entry.color() == null ? EssentialColors.modalOutline() : entry.color();
+        int color = entry.color() == null ? 0xFF808080 : entry.color();
         graphics.fill(x + PADDING, y + PADDING - 1, x + PADDING + STRIP_WIDTH, y + height - PADDING + 1, color);
 
         int textX = x + PADDING + STRIP_WIDTH + STRIP_GAP;
         int top = y + PADDING;
 
-        graphics.drawString(font, title(entry), textX, top, EssentialColors.modalText(), EssentialColors.textShadow());
+        Component name = Component.literal(entry.cardName());
+        graphics.drawString(font, name, textX, top, CardPanel.HUD_TEXT, false);
+        textX += font.width(name) + PART_GAP;
 
         Component amount = amount(entry);
-        graphics.drawString(font, amount, textX, top + font.lineHeight + LINE_GAP,
-                entry.source() == Source.OUT ? EssentialColors.modalText() : EssentialColors.tabTextSelected(),
-                EssentialColors.textShadow());
-        graphics.drawString(font, balance(entry), textX + font.width(amount) + 6, top + font.lineHeight + LINE_GAP,
-                EssentialColors.cardBalance(), EssentialColors.textShadow());
+        graphics.drawString(font, amount, textX, top, entry.source() == Source.OUT ? OUT_COLOR : IN_COLOR, false);
+        textX += font.width(amount);
 
-        Component comment = comment(entry);
-
-        if (comment != null) {
-            graphics.drawString(font, comment, textX, top + (font.lineHeight + LINE_GAP) * 2,
-                    EssentialColors.cardBalance(), EssentialColors.textShadow());
+        Component extra = extra(entry);
+        if (extra != null) {
+            graphics.drawString(font, extra, textX + PART_GAP, top, CardPanel.HUD_DIM, false);
         }
     }
 
@@ -330,20 +389,30 @@ public final class IncomingNotifications {
     }
 
     private static int entryWidth(Font font, Entry entry) {
-        int text = Math.max(font.width(title(entry)), font.width(amount(entry)) + 6 + font.width(balance(entry)));
-        Component comment = comment(entry);
+        int text = font.width(entry.cardName()) + PART_GAP + font.width(amount(entry));
+        Component extra = extra(entry);
 
-        if (comment != null) {
-            text = Math.max(text, font.width(comment));
+        if (extra != null) {
+            text += PART_GAP + font.width(extra);
         }
 
         return PADDING * 2 + STRIP_WIDTH + STRIP_GAP + text;
     }
 
-    /** Two lines, and a third for a transfer's comment. */
     private static int entryHeight(Entry entry) {
-        int lines = comment(entry) == null ? 2 : 3;
-        return PADDING * 2 + lines * 9 + (lines - 1) * LINE_GAP;
+        return PADDING * 2 + 8;
+    }
+
+    /** Grey words after the amount: who a transfer went to, or that it came while away or held back. */
+    private static @Nullable Component extra(Entry entry) {
+        return switch (entry.source()) {
+            case OUT -> entry.receiver() == null ? null : Component.literal("→ " + entry.receiver());
+            case AWAY -> Component.translatable("gui.spwallet.notification.short_away");
+            case QUIET -> entry.count() > 1
+                    ? Component.translatable("gui.spwallet.notification.short_count", entry.count())
+                    : null;
+            case LIVE -> null;
+        };
     }
 
     private static Component title(Entry entry) {
@@ -371,14 +440,9 @@ public final class IncomingNotifications {
         return Component.literal("«" + comment + "»");
     }
 
+    /** {@code +123 АР} or {@code −5 АР}. */
     private static Component amount(Entry entry) {
-        Component amount = Component.translatable(entry.source() == Source.OUT
-                ? "gui.spwallet.notification.amount_out"
-                : "gui.spwallet.notification.amount", AmountFormat.card(entry.amount()));
-
-        return entry.count() > 1
-                ? Component.translatable("gui.spwallet.notification.amount_count", amount, entry.count())
-                : amount;
+        return Component.literal(entry.source() == Source.OUT ? "−" : "+").append(AmountFormat.card(entry.amount()));
     }
 
     private static Component balance(Entry entry) {

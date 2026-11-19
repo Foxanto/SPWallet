@@ -147,6 +147,16 @@ public final class CardInfoCache {
         return rows;
     }
 
+    /** Forgets when the cards of {@code server} were last fetched, so the next look fetches them again. */
+    public static void refreshNow(SPServer server) {
+        ACCOUNT_FETCHED.remove(server);
+        CardStorage storage = SPWalletClient.cards();
+        if (storage == null) return;
+        for (Card card : storage.cards(server)) {
+            BALANCE_FETCHED.remove(card.id());
+        }
+    }
+
     /** A card's colour, or {@code null} until {@code /accounts/me} has answered. Sends no request. */
     public static @Nullable Integer color(String cardId) {
         AccountCard account = ACCOUNT_CARDS.get(cardId);

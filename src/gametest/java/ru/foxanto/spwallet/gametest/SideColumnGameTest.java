@@ -13,10 +13,6 @@ import ru.foxanto.spwallet.util.SPServer;
  * notification a transfer of the player's own gets, with its comment cut short.
  */
 public class SideColumnGameTest implements FabricClientGameTest {
-    // Where the arrow is in the test window, read off the screenshots.
-    private static final double HIDE_X = 558;
-    private static final double SHOW_X = 760;
-    private static final double TOGGLE_Y = 36;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -26,7 +22,7 @@ public class SideColumnGameTest implements FabricClientGameTest {
 
             context.setScreen(() -> new WalletScreen(SPServer.SP));
             context.waitTicks(10);
-            TemplateGameTest.click(context, HIDE_X, TOGGLE_Y);
+            Ui.click(context, Ui.text("»"), "the arrow that hides the side column");
             expect(context.computeOnClient(client -> SPWalletConfig.get().sidePanelCollapsed),
                     "the arrow should have hidden the side column");
             context.takeScreenshot("spwallet_wallet_side_hidden");
@@ -34,7 +30,7 @@ public class SideColumnGameTest implements FabricClientGameTest {
             // Remembered: a new wallet opens without it too.
             context.setScreen(() -> new WalletScreen(SPServer.SP));
             context.waitTicks(10);
-            TemplateGameTest.click(context, SHOW_X, TOGGLE_Y);
+            Ui.click(context, Ui.text("«"), "the arrow that shows the side column");
             expect(!context.computeOnClient(client -> SPWalletConfig.get().sidePanelCollapsed),
                     "the arrow should have shown the side column again");
             context.takeScreenshot("spwallet_wallet_side_shown");

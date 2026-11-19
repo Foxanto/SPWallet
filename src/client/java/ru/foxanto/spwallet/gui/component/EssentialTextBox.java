@@ -36,10 +36,22 @@ public class EssentialTextBox extends FlowLayout {
         this.textBox.setBordered(false);
         this.textBox.setTextColor(EssentialColors.inputText());
         this.textBox.setTextShadow(EssentialColors.textShadow());
-        this.textBox.margins(Insets.of(10, 9, 9, 9));
+        this.textBox.margins(Insets.of(9, 8, 9, 9));
 
-        this.surface(Surface.flat(EssentialColors.border()));
+        this.surface((context, component) -> drawField(context, component.x(), component.y(), component.width(),
+                component.height(), this.textBox.isFocused()));
         this.child(this.textBox);
+    }
+
+    /**
+     * The look every field of the wallet shares: a filled box with a thin rounded edge, which turns
+     * blue while it is being typed in.
+     */
+    public static void drawField(net.minecraft.client.gui.GuiGraphics g, int x, int y, int width, int height,
+                                 boolean active) {
+        ru.foxanto.spwallet.gui.Shapes.rounded(g, x, y, width, height, 3, EssentialColors.border());
+        ru.foxanto.spwallet.gui.Shapes.roundedOutline(g, x, y, width, height, 3,
+                active ? EssentialColors.tabTextSelected() : EssentialColors.modalOutline());
     }
 
     public String value() {

@@ -48,7 +48,7 @@ public class HistoryGameTest implements FabricClientGameTest {
 
             context.setScreen(() -> new WalletScreen(SPServer.SP));
             context.waitTicks(10);
-            TemplateGameTest.click(context, TemplateGameTest.LOG_TAB_X, TemplateGameTest.TABS_Y);
+            Ui.click(context, Ui.text("Log"), "the Log tab");
             context.takeScreenshot("spwallet_wallet_history");
             context.setScreen(() -> null);
         }

@@ -20,7 +20,7 @@ public final class BalanceHud {
     /** Kept between the panel and the edge of the screen, whatever the saved position. */
     public static final int MARGIN = 4;
 
-    public static final CardPanel.Style STYLE = new CardPanel.Style(null, 0, false, false);
+    public static final CardPanel.Style STYLE = new CardPanel.Style(null, 0, false, false, true);
 
     private BalanceHud() {}
 
@@ -31,7 +31,9 @@ public final class BalanceHud {
                 || client.options.hideGui
                 || client.gui.getDebugOverlay().showDebugScreen()
                 // The editor draws its own copy, which is the one being dragged.
-                || client.screen instanceof HudPositionScreen) {
+                || client.screen instanceof HudPositionScreen
+                // The wallet shows the cards itself.
+                || client.screen instanceof ru.foxanto.spwallet.gui.WalletScreen) {
             return;
         }
 

@@ -16,7 +16,8 @@
       "ru.foxanto.spwallet.gametest.HistoryGameTest",
       "ru.foxanto.spwallet.gametest.TemplateGameTest",
       "ru.foxanto.spwallet.gametest.QuietGameTest",
-      "ru.foxanto.spwallet.gametest.SideColumnGameTest"
+      "ru.foxanto.spwallet.gametest.SideColumnGameTest",
+      "ru.foxanto.spwallet.gametest.ConnectGameTest"
     ]
   },
   "depends": {

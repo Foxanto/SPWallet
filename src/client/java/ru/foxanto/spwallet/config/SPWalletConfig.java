@@ -107,8 +107,29 @@ public class SPWalletConfig {
     @SerialEntry
     public float notificationX = 0;
 
+    /** Below zero: right under the favourite cards on the HUD, until the player moves it. */
     @SerialEntry
-    public float notificationY = 1;
+    public float notificationY = -1;
+
+    /** Скачивать новые версии SPWallet с GitHub и ставить их при выходе из игры. */
+    @SerialEntry
+    public boolean autoUpdate = true;
+
+    /** «SPConnect от SPWallet»: получать вызовы организаций, где игрок сотрудник. */
+    @SerialEntry
+    public boolean connectEnabled = true;
+
+    /** Сайт SPConnect. Кошелёк отправляет туда только ник, сервер, координаты и сообщение вызова. */
+    @SerialEntry
+    public String connectApiUrl = "https://connector.spm.sniffsniff.ru";
+
+    /** Всплывающее уведомление о новом вызове. */
+    @SerialEntry
+    public boolean connectToasts = true;
+
+    /** Звук нового вызова. */
+    @SerialEntry
+    public boolean connectSound = true;
 
     /** Which palette the mod's screens and panels are drawn in. */
     @SerialEntry

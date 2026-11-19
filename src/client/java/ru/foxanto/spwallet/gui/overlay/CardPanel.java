@@ -60,9 +60,20 @@ public final class CardPanel {
      * @param headerReserve width kept free at the right of the header, for buttons drawn over it
      * @param showNumbers whether to show each card's number after its name
      * @param favourites whether each row carries the star that puts the card on the HUD
+     * @param hud the in-game look: a grey see-through box like the F3 screen, no outline, the same
+     *            in the light and the dark theme, since it sits over the world rather than a panel
      */
     public record Style(@Nullable Component header, int headerReserve, boolean showNumbers,
-                        boolean favourites) {}
+                        boolean favourites, boolean hud) {
+        public Style(@Nullable Component header, int headerReserve, boolean showNumbers, boolean favourites) {
+            this(header, headerReserve, showNumbers, favourites, false);
+        }
+    }
+
+    /** The F3 screen's box and text, which the HUD look copies. */
+    public static final int HUD_BACKGROUND = 0x90505050;
+    public static final int HUD_TEXT = 0xFFE0E0E0;
+    public static final int HUD_DIM = 0xFFA8A8A8;
 
     private CardPanel() {}
 
@@ -125,8 +136,12 @@ public final class CardPanel {
         int width = width(font, rows, style);
         int height = height(rows, style);
 
-        graphics.fill(x, y, x + width, y + height, EssentialColors.hudBackground());
-        graphics.renderOutline(x, y, width, height, EssentialColors.border());
+        if (style.hud()) {
+            graphics.fill(x, y, x + width, y + height, HUD_BACKGROUND);
+        } else {
+            graphics.fill(x, y, x + width, y + height, EssentialColors.hudBackground());
+            graphics.renderOutline(x, y, width, height, EssentialColors.border());
+        }
 
         int top = y + PADDING;
 
@@ -160,11 +175,14 @@ public final class CardPanel {
             graphics.fill(left, top - 1, left + STRIP_WIDTH, top + ROW_HEIGHT, color);
 
             graphics.drawString(font, label(row, style), left + STRIP_WIDTH + STRIP_GAP, top,
-                    EssentialColors.modalText(), EssentialColors.textShadow());
+                    style.hud() ? HUD_TEXT : EssentialColors.modalText(), !style.hud() && EssentialColors.textShadow());
 
             Component balance = balance(row);
+            int balanceColor = row.failed()
+                    ? (style.hud() ? 0xFFFF5555 : EssentialColors.error())
+                    : (style.hud() ? HUD_DIM : EssentialColors.tabText());
             graphics.drawString(font, balance, x + width - PADDING - font.width(balance), top,
-                    row.failed() ? EssentialColors.error() : EssentialColors.tabText(), EssentialColors.textShadow());
+                    balanceColor, !style.hud() && EssentialColors.textShadow());
 
             bounds.add(rowBounds);
             top += ROW_HEIGHT + ROW_GAP;
@@ -176,7 +194,7 @@ public final class CardPanel {
             graphics.drawString(font, STATUS_MARK, x + PADDING, top,
                     EssentialColors.apiStatus(ApiStatus.state()), EssentialColors.textShadow());
             graphics.drawString(font, status, x + PADDING + font.width(STATUS_MARK) + STATUS_GAP, top,
-                    EssentialColors.cardBalance(), EssentialColors.textShadow());
+                    style.hud() ? HUD_DIM : EssentialColors.cardBalance(), !style.hud() && EssentialColors.textShadow());
         }
 
         return bounds;

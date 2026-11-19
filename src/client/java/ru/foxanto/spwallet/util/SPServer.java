@@ -4,23 +4,47 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
 
+import java.util.List;
+import java.util.Locale;
+
 /** The SPWorlds server the player is currently on. */
 public enum SPServer {
-    SP("sp.spworlds.ru", "sp"),
-    SPM("spm.spworlds.ru", "spm"),
-    OTHER(null, null);
+    SP("sp", "sp.spworlds.ru", "sp.spworlds.org"),
+    SPM("spm", "spm.spworlds.ru", "spm.spworlds.org"),
+    OTHER(null);
 
-    private final String address;
     private final String key;
+    private final List<String> hosts;
 
-    SPServer(String address, String key) {
-        this.address = address;
+    SPServer(String key, String... hosts) {
         this.key = key;
+        this.hosts = List.of(hosts);
     }
 
-    /** The server address this constant matches, or {@code null} for {@link #OTHER}. */
+    /** The main address of this server, or {@code null} for {@link #OTHER}. */
     public String address() {
-        return this.address;
+        return this.hosts.isEmpty() ? null : this.hosts.get(0);
+    }
+
+    /**
+     * The server an address in the server list points to: either domain of it, with or without a
+     * port, any case, and with a trailing dot or a subdomain in front.
+     */
+    public static SPServer byAddress(String address) {
+        String host = address.toLowerCase(Locale.ROOT).trim();
+        int colon = host.lastIndexOf(':');
+        if (colon > 0 && host.indexOf(':') == colon) host = host.substring(0, colon);
+        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
+
+        for (SPServer candidate : values()) {
+            for (String known : candidate.hosts) {
+                if (host.equals(known) || host.endsWith("." + known)) {
+                    return candidate;
+                }
+            }
+        }
+
+        return OTHER;
     }
 
     /** The key this server's cards are stored under, or {@code null} for {@link #OTHER}. */
@@ -46,12 +70,6 @@ public enum SPServer {
             return OTHER;
         }
 
-        for (SPServer candidate : values()) {
-            if (candidate.address != null && candidate.address.equalsIgnoreCase(server.ip)) {
-                return candidate;
-            }
-        }
-
-        return OTHER;
+        return byAddress(server.ip);
     }
 }

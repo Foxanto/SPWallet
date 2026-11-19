@@ -27,13 +27,6 @@ import java.util.List;
  */
 public class TemplateGameTest implements FabricClientGameTest {
     // Where things are in the test window, read off the screenshots.
-    static final double QUICK_TAB_X = 633;
-    static final double LOG_TAB_X = 703;
-    static final double TABS_Y = 36;
-    private static final double RENT_TEMPLATE_X = 680;
-    private static final double RENT_TEMPLATE_Y = 190;
-    private static final double NICKNAME_BOX_X = 380;
-    private static final double NICKNAME_BOX_Y = 151;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -58,18 +51,19 @@ public class TemplateGameTest implements FabricClientGameTest {
             context.waitTicks(10);
             // The side column opens on whichever tab was open last, which the journal test left on
             // the log.
-            click(context, QUICK_TAB_X, TABS_Y);
+            Ui.click(context, Ui.text("Quick"), "the Quick tab");
             context.takeScreenshot("spwallet_wallet_quick");
 
             // One click on a template fills in the whole form, the player's card looked up included.
-            click(context, RENT_TEMPLATE_X, RENT_TEMPLATE_Y);
+            Ui.click(context, Ui.text("Аренда"), "the rent template");
             context.waitTicks(10);
             context.takeScreenshot("spwallet_wallet_template_filled");
 
             // Tab completes the nickname from the tab list: typed "Pl", the test player is "Player…".
             context.setScreen(() -> new WalletScreen(SPServer.SP, "Pl"));
             context.waitTicks(10);
-            click(context, NICKNAME_BOX_X, NICKNAME_BOX_Y);
+            Ui.click(context, component -> component instanceof io.wispforest.owo.ui.component.TextBoxComponent box
+                    && box.getValue().equals("Pl"), "the nickname box");
             context.getInput().pressKey(GLFW.GLFW_KEY_TAB);
             context.waitTicks(2);
             context.takeScreenshot("spwallet_wallet_nickname_completed");

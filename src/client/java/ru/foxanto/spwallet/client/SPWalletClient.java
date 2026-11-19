@@ -24,6 +24,10 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 import ru.foxanto.spwallet.SPWallet;
 import ru.foxanto.spwallet.api.Card;
 import ru.foxanto.spwallet.commands.APICommand;
+import ru.foxanto.spwallet.connect.SPConnect;
+import ru.foxanto.spwallet.gui.overlay.CallHud;
+import ru.foxanto.spwallet.update.UpdateNotice;
+import ru.foxanto.spwallet.update.Updater;
 import ru.foxanto.spwallet.commands.AddCardCommand;
 import ru.foxanto.spwallet.config.SPWalletConfig;
 import ru.foxanto.spwallet.gui.AddCardScreen;
@@ -93,11 +97,16 @@ public class SPWalletClient implements ClientModInitializer {
         history = new HistoryStorage();
         templates = new TemplateStorage();
         PaymentSound.createFolder();
+        SPConnect.init();
+        CallHud.register(CATEGORY);
+        UpdateNotice.register();
+        Updater.checkAsync();
 
         // Client commands: handled locally, never sent to the Minecraft server.
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             APICommand.register(dispatcher);
             AddCardCommand.register(dispatcher);
+            SPConnect.registerCommands(dispatcher);
         });
 
         openWalletKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -132,6 +141,7 @@ public class SPWalletClient implements ClientModInitializer {
         // Over the chat, since the bottom left corner the notifications start in is where it is.
         HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, SPWallet.id("incoming"),
                 IncomingNotifications::render);
+        HudElementRegistry.attachElementAfter(SPWallet.id("incoming"), SPWallet.id("calls"), CallHud::render);
         InventoryCardPanel.register();
         OrePanel.register();
 

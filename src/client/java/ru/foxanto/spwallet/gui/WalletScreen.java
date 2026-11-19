@@ -14,6 +14,7 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -34,19 +35,23 @@ import ru.foxanto.spwallet.storage.HistoryStorage;
 import ru.foxanto.spwallet.storage.TemplateStorage;
 import ru.foxanto.spwallet.config.ConfigScreen;
 import ru.foxanto.spwallet.config.SPWalletConfig;
-import ru.foxanto.spwallet.gui.component.CardList;
+import ru.foxanto.spwallet.gui.component.BankCard;
 import ru.foxanto.spwallet.gui.component.EssentialButton;
 import ru.foxanto.spwallet.gui.component.EssentialScrollContainer;
 import ru.foxanto.spwallet.gui.component.EssentialTextBox;
 import ru.foxanto.spwallet.gui.component.HistoryList;
 import ru.foxanto.spwallet.gui.component.ApiStatusMark;
-import ru.foxanto.spwallet.gui.component.PlayerCardList;
+import ru.foxanto.spwallet.gui.component.PillButton;
+import ru.foxanto.spwallet.gui.component.SkinView;
+import ru.foxanto.spwallet.gui.component.TargetPicker;
 import ru.foxanto.spwallet.gui.component.QuickList;
+import ru.foxanto.spwallet.gui.component.CallList;
 import ru.foxanto.spwallet.gui.component.TabBar;
 import ru.foxanto.spwallet.gui.component.TransparentButton;
 import ru.foxanto.spwallet.gui.overlay.IncomingNotifications;
 import ru.foxanto.spwallet.util.CardInfoCache;
 import ru.foxanto.spwallet.util.PaymentSound;
+import ru.foxanto.spwallet.util.DebugData;
 import ru.foxanto.spwallet.util.SPServer;
 import ru.foxanto.spwallet.util.TransferMode;
 
@@ -56,6 +61,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /** The wallet: the saved cards on the left, the transfer form on the right. */
@@ -68,8 +74,8 @@ public class WalletScreen extends EssentialScreen {
      * journal takes the rest. The card rows fit a name, a number and the delete button, so the
      * first cannot go much below 30.
      */
-    private static final int CARD_PANEL_PERCENT = 36;
-    private static final int TRANSFER_PANEL_PERCENT = 34;
+    private static final int CARD_PANEL_PERCENT = 35;
+    private static final int TRANSFER_PANEL_PERCENT = 33;
     private static final int SIDE_PANEL_PERCENT = 100 - CARD_PANEL_PERCENT - TRANSFER_PANEL_PERCENT;
     /** The card list's width with the side column hidden, which is what it was before there was one. */
     private static final int COLLAPSED_CARD_PANEL_PERCENT = 40;
@@ -98,18 +104,30 @@ public class WalletScreen extends EssentialScreen {
     private @Nullable PlayerCard selectedTarget;
 
     private FlowLayout root;
-    private EssentialScrollContainer cardList;
     private FlowLayout form;
     private EssentialTextBox numberBox;
     private EssentialTextBox nicknameBox;
     private EssentialTextBox amountBox;
     private EssentialTextBox commentBox;
-    private EssentialButton findButton;
     private TabBar<TransferMode> modeTabs;
-    private EssentialButton transferButton;
-    private PlayerCardList playerCards;
-    private EssentialScrollContainer playerCardsScroll;
+    private PillButton transferButton;
+    /** The receiver's cards, once the nickname is looked up. */
+    private TargetPicker playerCards;
+    private SkinView skin;
+    /** What is known about the receiver: cards, whether online, earlier transfers. */
+    private FlowLayout info;
+    private String shownInfo = "";
     private Runnable revalidate = () -> {};
+    /** The stack of bank cards on the left. */
+    private FlowLayout cardStack;
+    private final List<BankCard> bankCards = new ArrayList<>();
+    private int cardWidth;
+    private FlowLayout mainRow;
+    private FlowLayout sideColumn;
+    private int ticks;
+    /** The tick at which the typed nickname is looked up, or -1 for none pending. */
+    private int lookupAt = -1;
+    private static final int LOOKUP_DELAY_TICKS = 10;
 
     /** Which part of the side column was open last, which a new wallet opens on again. */
     private static SideTab lastSideTab = SideTab.QUICK;
@@ -119,19 +137,11 @@ public class WalletScreen extends EssentialScreen {
 
     private SideTab sideTab = lastSideTab;
 
-    /** The whole wallet and its three rows, which the side column is taken out of when hidden. */
-    private FlowLayout frame;
-    private FlowLayout navRow;
-    private FlowLayout tabRow;
-    private FlowLayout bodyRow;
-    /** The card column's and the transfer column's piece of each row, resized with the side column. */
-    private final List<FlowLayout> cardColumns = new ArrayList<>();
-    private final List<FlowLayout> transferColumns = new ArrayList<>();
-    private FlowLayout transferNav;
-    private FlowLayout sideNav;
-    private FlowLayout sideBody;
     private UIComponent statusMark;
     private UIComponent settingsGear;
+    /** The phone in the header, which opens the call tab while the side column is hidden. */
+    private UIComponent callButton;
+    private TabBar<SideTab> sideTabs;
     private TransparentButton sideToggle;
     /** Set by the arrow, done on the next tick: the click is still going round the columns it moves. */
     private boolean sideLayoutPending;
@@ -139,6 +149,9 @@ public class WalletScreen extends EssentialScreen {
     private FlowLayout sideContent;
     private UIComponent historyBar;
     private UIComponent quickBar;
+    private UIComponent callBar;
+    private CallList callList;
+    private EssentialScrollContainer callScroll;
     private EssentialScrollContainer historyScroll;
     private EssentialScrollContainer quickScroll;
     private QuickList quickList;
@@ -156,6 +169,27 @@ public class WalletScreen extends EssentialScreen {
 
     /** Set while this screen closes itself, so the mixin does not restore the scale twice. */
     public boolean closing = false;
+
+    /**
+     * Opens the wallet with the side column shown on the call tab, as the [Оценить] button in chat
+     * asks. Off an SPWorlds server it only works while debugging, like the wallet key.
+     */
+    public static void openCallTab() {
+        SPServer server = SPServer.current();
+
+        if (server == SPServer.OTHER) {
+            if (!DebugData.enabled()) {
+                return;
+            }
+
+            server = SPServer.SP;
+        }
+
+        lastSideTab = SideTab.CALL;
+        SPWalletConfig.get().sidePanelCollapsed = false;
+        SPWalletConfig.HANDLER.save();
+        Minecraft.getInstance().setScreen(new WalletScreen(server));
+    }
 
     public WalletScreen(SPServer server) {
         this(server, null, 0, null);
@@ -198,6 +232,13 @@ public class WalletScreen extends EssentialScreen {
     @Override
     public void tick() {
         super.tick();
+        this.ticks++;
+        if (this.lookupAt >= 0 && this.ticks >= this.lookupAt) {
+            this.lookupAt = -1;
+            if (this.canLookUp()) this.findPlayerCards();
+        }
+        this.refreshCards();
+        this.refreshInfo();
         this.revalidate.run();
         this.refreshHistory();
         this.refreshQuick();
@@ -217,6 +258,15 @@ public class WalletScreen extends EssentialScreen {
             return true;
         }
 
+        // Enter in the nickname field looks it up at once.
+        if ((input.key() == GLFW.GLFW_KEY_ENTER || input.key() == GLFW.GLFW_KEY_KP_ENTER)
+                && this.mode == TransferMode.NICKNAME && this.nicknameBox != null
+                && this.nicknameBox.textBox.isFocused() && this.canLookUp()) {
+            this.lookupAt = -1;
+            this.findPlayerCards();
+            return true;
+        }
+
         return super.keyPressed(input);
     }
 
@@ -224,7 +274,9 @@ public class WalletScreen extends EssentialScreen {
     private enum SideTab {
         /** Saved payments and recent receivers. */
         QUICK("quick"),
-        HISTORY("history");
+        HISTORY("history"),
+        /** «SPConnect от SPWallet»: calling staff of an organisation. */
+        CALL("call");
 
         private final String key;
 
@@ -331,32 +383,17 @@ public class WalletScreen extends EssentialScreen {
             this.commentBox.textBox.text(this.prefilledComment);
         }
 
-        this.playerCards = new PlayerCardList(target -> {
+        this.playerCards = new TargetPicker(Sizing.fill(100), target -> {
             this.selectedTarget = target;
             this.revalidate.run();
         });
 
-        this.findButton = new EssentialButton(EssentialButton.Style.NEUTRAL,
-                Component.translatable("gui.spwallet.button.find_cards"),
-                button -> this.findPlayerCards());
-        this.findButton.horizontalSizing(Sizing.fill(100));
-        this.findButton.verticalSizing(Sizing.fixed(18));
-
-        // Fixed height: however many cards the player turns out to have, the form below stays put.
-        this.playerCardsScroll = new EssentialScrollContainer(
-                ScrollContainer.ScrollDirection.VERTICAL, Sizing.fill(100), Sizing.fixed(PLAYER_CARDS_HEIGHT),
-                this.playerCards);
-
-        this.transferButton = new EssentialButton(EssentialButton.Style.FLAT,
-                Component.translatable("gui.spwallet.button.transfer"),
+        this.transferButton = new PillButton(Component.translatable("gui.spwallet.button.send"), PillButton.GREEN,
                 button -> this.transfer());
-        this.transferButton.horizontalSizing(Sizing.fill(100));
+        this.transferButton.horizontalSizing(Sizing.fixed(110));
         this.transferButton.verticalSizing(Sizing.fixed(18));
 
-        this.revalidate = () -> {
-            this.transferButton.active(this.canTransfer());
-            this.findButton.active(this.canLookUp());
-        };
+        this.revalidate = () -> this.transferButton.active(this.canTransfer());
 
         this.numberBox.textBox.onChanged().subscribe(value -> {
             String number = CardNumber.normalize(value);
@@ -373,30 +410,34 @@ public class WalletScreen extends EssentialScreen {
         this.amountBox.textBox.onChanged().subscribe(value -> this.revalidate.run());
         this.nicknameBox.textBox.onChanged().subscribe(value -> {
             this.playerCards.clear();
+            // Looked up by itself once the player stops typing, no button needed.
+            this.lookupAt = this.ticks + LOOKUP_DELAY_TICKS;
             this.revalidate.run();
         });
 
-        this.form = UIContainers.verticalFlow(Sizing.fill(88), Sizing.content());
+        // Sizes follow the window: the wallet has to fit a small window at GUI scale 2 too.
+        int cardWidth = Math.clamp(Math.round(this.width * 0.24F), 96, 132);
+        int panelWidth = Math.clamp(Math.round(this.width * 0.44F), 186, 270);
+        int sideWidth = Math.clamp(Math.round(this.width * 0.24F), 104, 160);
+        int height = Math.clamp(this.height - 40, 150, 300);
+        boolean compact = this.height < 300;
+
+        this.skin = new SkinView(Sizing.fixed(compact ? 40 : 56), Sizing.fixed(compact ? 54 : 78), () ->
+                this.mode == TransferMode.NICKNAME && NICKNAME.matcher(this.nicknameBox.value()).matches()
+                        ? this.nicknameBox.value() : null);
+        this.info = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+        this.info.gap(2);
+
+        this.form = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
         this.rebuildForm();
 
-        this.cardList = new EssentialScrollContainer(
-                ScrollContainer.ScrollDirection.VERTICAL, Sizing.fill(100), Sizing.fill(100),
-                this.buildCardList(rootComponent));
-
-        TabBar<SPServer> serverTabs = new TabBar<>(List.of(SPServer.SP, SPServer.SPM), this.server,
-                SPServer::label, selected -> {
-            this.server = selected;
-            this.reloadCards(rootComponent);
-        });
-        serverTabs.padding(Insets.of(10, 10, 12, 12));
-
-        this.modeTabs = new TabBar<>(List.of(TransferMode.values()), this.mode,
+        this.modeTabs = new TabBar<>(List.of(TransferMode.NICKNAME, TransferMode.NUMBER), this.mode,
                 TransferMode::label, selected -> {
             this.mode = selected;
             this.rebuildForm();
             this.revalidate.run();
         });
-        this.modeTabs.padding(Insets.of(10, 10, 12, 12));
+        this.modeTabs.margins(Insets.of(0, 5, 6, 0));
 
         this.historyList = new HistoryList();
         this.historyScroll = new EssentialScrollContainer(
@@ -412,28 +453,39 @@ public class WalletScreen extends EssentialScreen {
         this.quickScroll = new EssentialScrollContainer(
                 ScrollContainer.ScrollDirection.VERTICAL, Sizing.fill(100), Sizing.fill(100), this.quickList);
 
+        this.callList = new CallList();
+        this.callScroll = new EssentialScrollContainer(
+                ScrollContainer.ScrollDirection.VERTICAL, Sizing.fill(100), Sizing.fill(100), this.callList);
+
         TabBar<SideTab> sideTabs = new TabBar<>(List.of(SideTab.values()), this.sideTab,
                 SideTab::label, selected -> {
             this.sideTab = selected;
             lastSideTab = selected;
             this.showSideTab();
         });
-        sideTabs.margins(Insets.of(11, 0, 10, 0));
+        sideTabs.gap(10);
+        sideTabs.margins(Insets.of(0, 5, 6, 0));
+        this.sideTabs = sideTabs;
 
         TabBar<HistoryFilter> historyTabs = new TabBar<>(List.of(HistoryFilter.values()), this.historyFilter,
                 HistoryFilter::label, selected -> {
             this.historyFilter = selected;
             this.refreshHistory();
         });
-        historyTabs.padding(Insets.of(10, 10, 12, 12));
 
-        this.historyBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(100))
+        this.historyBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
                 .child(historyTabs)
                 .child(this.clearHistoryButton(rootComponent));
-        this.quickBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(100))
+        this.quickBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
                 .child(this.saveTemplateButton(rootComponent));
-        this.sideBar = UIContainers.horizontalFlow(Sizing.fill(SIDE_PANEL_PERCENT), Sizing.fill(100));
-        this.sideContent = UIContainers.verticalFlow(Sizing.fill(100), Sizing.fill(100));
+        this.callBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
+                .child(UIComponents.label(Component.translatable("gui.spwallet.connect.bar"))
+                        .color(Color.ofArgb(EssentialColors.tabText()))
+                        .shadow(EssentialColors.textShadow()));
+        this.sideBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        this.sideBar.margins(Insets.of(8, 6, 8, 8));
+        this.sideContent = UIContainers.verticalFlow(Sizing.fill(100), Sizing.expand());
+        this.sideContent.margins(Insets.of(0, 6, 6, 6));
         this.showSideTab();
 
         this.revalidate.run();
@@ -442,72 +494,59 @@ public class WalletScreen extends EssentialScreen {
 
         this.statusMark = this.apiStatusMark();
         this.settingsGear = this.settingsButton();
+        this.callButton = this.callButton();
         this.sideToggle = this.sideToggleButton();
 
-        FlowLayout cardNav = UIContainers.horizontalFlow(Sizing.fill(CARD_PANEL_PERCENT), Sizing.fill(100));
-        cardNav.child(UIComponents.label(Component.translatable("gui.spwallet.title.cards"))
+        // --- The cards: a stack of bank cards, the selected one standing out, and the refresh button.
+        this.cardStack = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        this.cardStack.gap(5).padding(Insets.of(3, 3, 0, 4));
+        this.cardWidth = cardWidth;
+        this.fillCardStack();
+        this.refreshCards();
+        EssentialScrollContainer cardScroll = new EssentialScrollContainer(ScrollContainer.ScrollDirection.VERTICAL,
+                Sizing.content(), Sizing.fixed(height - 22), this.cardStack);
+        FlowLayout cardsColumn = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        cardsColumn.child(cardScroll).child(this.refreshButton()).gap(4)
+                .horizontalAlignment(HorizontalAlignment.CENTER);
+
+        // --- The transfer panel: title and icons, then the form.
+        FlowLayout header = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        header.child(UIComponents.label(Component.translatable("gui.spwallet.title.make_transfer"))
                         .color(Color.ofArgb(EssentialColors.screenTitle()))
-                        .shadow(EssentialColors.textShadow())
-                        .margins(Insets.of(11, 0, 13, 0)))
+                        .shadow(EssentialColors.textShadow()))
+                .child(UIComponents.spacer().verticalSizing(Sizing.fixed(0)))
                 .child(this.doNotDisturbButton())
-                .surface(EssentialSurfaces.NAV_LEFT);
-
-        this.transferNav = UIContainers.horizontalFlow(Sizing.fill(TRANSFER_PANEL_PERCENT), Sizing.fill(100));
-        this.transferNav.child(UIComponents.label(Component.translatable("gui.spwallet.title.transfer"))
-                        .color(Color.ofArgb(EssentialColors.screenTitle()))
-                        .shadow(EssentialColors.textShadow())
-                        .margins(Insets.of(11, 0, 10, 0)))
+                .child(this.callButton)
+                .child(this.statusMark)
+                .child(this.settingsGear)
                 .child(this.sideToggle)
-                .surface(EssentialSurfaces.NAV_RIGHT);
+                .gap(8)
+                .verticalAlignment(VerticalAlignment.CENTER);
 
-        this.sideNav = UIContainers.horizontalFlow(Sizing.fill(SIDE_PANEL_PERCENT), Sizing.fill(100));
-        this.sideNav.child(sideTabs).surface(EssentialSurfaces.NAV_RIGHT);
+        FlowLayout panel = UIContainers.verticalFlow(Sizing.fixed(panelWidth), Sizing.content());
+        panel.child(header).child(this.form.margins(Insets.top(compact ? 7 : 10)))
+                .padding(compact ? Insets.of(8, 9, 10, 10) : Insets.of(10, 12, 12, 12))
+                .surface(panelSurface());
 
-        FlowLayout cardTabs = UIContainers.horizontalFlow(Sizing.fill(CARD_PANEL_PERCENT), Sizing.fill(100));
-        cardTabs.child(serverTabs).surface(EssentialSurfaces.PANEL_LEFT);
+        FlowLayout transferColumn = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        transferColumn.child(this.modeTabs).child(panel);
 
-        FlowLayout transferTabs = UIContainers.horizontalFlow(Sizing.fill(TRANSFER_PANEL_PERCENT), Sizing.fill(100));
-        transferTabs.child(this.modeTabs).surface(EssentialSurfaces.PANEL_RIGHT_TOP);
+        // --- The side panel: templates, journal, calls.
+        FlowLayout sidePanel = UIContainers.verticalFlow(Sizing.fixed(sideWidth), Sizing.fixed(height));
+        sidePanel.child(this.sideBar).child(this.sideContent).surface(panelSurface());
+        this.sideColumn = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        this.sideColumn.child(sideTabs).child(sidePanel);
 
-        this.sideBar.surface(EssentialSurfaces.PANEL_RIGHT_TOP);
-
-        FlowLayout cardBody = UIContainers.horizontalFlow(Sizing.fill(CARD_PANEL_PERCENT), Sizing.fill(100));
-        cardBody.child(UIContainers.verticalFlow(Sizing.fill(100), Sizing.fill(100))
-                        .child(this.cardList)
-                        .margins(Insets.of(0, 3, 3, 0)))
-                .surface(EssentialSurfaces.PANEL_LEFT);
-
-        FlowLayout transferBody = UIContainers.horizontalFlow(Sizing.fill(TRANSFER_PANEL_PERCENT), Sizing.fill(100));
-        transferBody.child(UIContainers.verticalFlow(Sizing.fill(100), Sizing.fill(100))
-                        .child(this.form)
-                        .margins(Insets.of(0, 8, 0, 3))
-                        .horizontalAlignment(HorizontalAlignment.CENTER)
-                        .verticalAlignment(VerticalAlignment.CENTER))
-                .surface(EssentialSurfaces.PANEL_RIGHT);
-
-        this.sideBody = UIContainers.horizontalFlow(Sizing.fill(SIDE_PANEL_PERCENT), Sizing.fill(100));
-        this.sideBody.child(this.sideContent.margins(Insets.of(0, 6, 6, 6)))
-                .surface(EssentialSurfaces.PANEL_RIGHT);
-
-        this.cardColumns.addAll(List.of(cardNav, cardTabs, cardBody));
-        this.transferColumns.addAll(List.of(this.transferNav, transferTabs, transferBody));
-
-        this.navRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(30));
-        this.navRow.child(cardNav).child(this.transferNav);
-        this.tabRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(30));
-        this.tabRow.child(cardTabs).child(transferTabs);
-        this.bodyRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(72));
-        this.bodyRow.child(cardBody).child(transferBody);
-
-        this.frame = UIContainers.verticalFlow(Sizing.fill(96), Sizing.content());
-        this.frame.child(this.navRow).child(this.tabRow).child(this.bodyRow);
+        this.mainRow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        this.mainRow.child(cardsColumn).child(transferColumn).gap(8).verticalAlignment(VerticalAlignment.TOP);
         this.layOutSideColumn();
 
         rootComponent
-                .child(this.frame)
+                .child(this.mainRow)
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .verticalAlignment(VerticalAlignment.CENTER)
-                .surface(Surface.flat(EssentialColors.background()));
+                // The world shows through, dimmed, like the game's own menus over a running game.
+                .surface(Surface.flat(EssentialColors.light() ? 0x66000000 : 0x99000000));
 
         if (this.mode == TransferMode.NICKNAME && this.prefilledTarget != null) {
             this.findPlayerCards();
@@ -516,38 +555,166 @@ public class WalletScreen extends EssentialScreen {
         }
     }
 
+    /** A panel of the wallet: the theme's background with a thin rounded edge. */
+    private static Surface panelSurface() {
+        return (context, component) -> {
+            Shapes.rounded(context, component.x(), component.y(), component.width(), component.height(), 6,
+                    EssentialColors.background());
+            Shapes.roundedOutline(context, component.x(), component.y(), component.width(), component.height(), 6,
+                    EssentialColors.modalOutline());
+        };
+    }
+
     /**
-     * Shows or hides the side column as {@link SPWalletConfig#sidePanelCollapsed} says. Hidden, the
-     * card list and the form get the room back, as they had it before there was a side column, and
-     * the status dot and the gear move into the transfer header.
+     * Hands each bank card its latest balance, number and colour. Reading them is also what asks
+     * the API for whatever is missing or stale.
+     */
+    private void refreshCards() {
+        if (this.bankCards.isEmpty()) return;
+        java.util.Map<String, CardInfoCache.Row> rows = new java.util.HashMap<>();
+        for (CardInfoCache.Row row : CardInfoCache.rows(this.server)) rows.put(row.id(), row);
+        for (BankCard card : this.bankCards) card.row(rows.get(card.card.id()));
+    }
+
+    /** Puts a bank card into the stack for each saved card of this server and selects the first. */
+    private void fillCardStack() {
+        this.cardStack.clearChildren();
+        this.bankCards.clear();
+        List<Card> cards = SPWalletClient.cards().cards(this.server);
+
+        if (cards.isEmpty()) {
+            this.cardStack.child(UIComponents.label(Component.translatable("gui.spwallet.cards.empty"))
+                    .color(Color.ofArgb(EssentialColors.cardBalance()))
+                    .shadow(EssentialColors.textShadow())
+                    .horizontalSizing(Sizing.fixed(this.cardWidth)));
+            this.selectedCard = null;
+            return;
+        }
+
+        for (Card card : cards) {
+            BankCard bankCard = new BankCard(card, this.cardWidth, this::selectCard, this::openCardMenu);
+            this.bankCards.add(bankCard);
+            this.cardStack.child(bankCard);
+            fetchBalance(card);
+        }
+
+        Card keep = this.selectedCard;
+        BankCard first = this.bankCards.stream().filter(b -> keep != null && b.card.id().equals(keep.id()))
+                .findFirst().orElse(this.bankCards.getFirst());
+        this.selectCard(first);
+    }
+
+    /**
+     * Asks for a card's balance when the wallet opens, whatever the back-off says: the player opened
+     * the wallet to see it, and the answer is also what notices the API is back.
+     */
+    private static void fetchBalance(Card card) {
+        Minecraft client = Minecraft.getInstance();
+        long requestedAt = System.currentTimeMillis();
+        SPWorldsApi.balance(card)
+                .thenAcceptAsync(balance -> CardInfoCache.balanceFetched(card, balance, requestedAt), client)
+                .exceptionally(throwable -> {
+                    SPWallet.LOGGER.warn("Could not read the balance of card {}: {}", card.id(),
+                            ApiException.messageOf(throwable));
+                    return null;
+                });
+    }
+
+    private void selectCard(BankCard bankCard) {
+        for (BankCard other : this.bankCards) other.selected = other == bankCard;
+        this.selectedCard = bankCard.card;
+        this.revalidate.run();
+        this.refreshHistory();
+    }
+
+    /** The square under the cards that fetches the cards and balances again. */
+    private UIComponent refreshButton() {
+        PillButton button = new PillButton(Component.literal("⟳"), 0xFFE4E4E4, pressed -> {
+                    CardInfoCache.refreshNow(this.server);
+                    this.fillCardStack();
+                    this.refreshCards();
+                });
+        button.sizing(Sizing.fixed(18), Sizing.fixed(18));
+        button.radius(4).textColor(0xFF303030);
+        button.tooltip(Component.translatable("gui.spwallet.cards.refresh"));
+        return button;
+    }
+
+    /**
+     * The menu of the card's square: on the HUD or not, its money notifications, copying its number
+     * and deleting it.
+     */
+    private void openCardMenu(BankCard bankCard, int[] at) {
+        Card card = bankCard.card;
+        AtomicReference<OverlayContainer<UIComponent>> overlay = new AtomicReference<>();
+        FlowLayout menu = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+        menu.gap(2).padding(Insets.of(5, 6, 8, 8)).surface(panelSurface());
+
+        boolean favourite = SPWalletClient.cards().isFavourite(card.id());
+        boolean notifies = SPWalletClient.cards().notifiesIncoming(card.id());
+        CardInfoCache.Row row = CardInfoCache.rows(this.server).stream()
+                .filter(r -> r.id().equals(card.id())).findFirst().orElse(null);
+
+        menu.child(this.menuItem(Component.translatable(favourite ? "gui.spwallet.card_menu.unfavourite"
+                : "gui.spwallet.card_menu.favourite"), EssentialColors.modalText(), () -> {
+            SPWalletClient.cards().toggleFavourite(card.id());
+            overlay.get().remove();
+        }));
+        menu.child(this.menuItem(Component.translatable(notifies ? "gui.spwallet.card_menu.mute"
+                : "gui.spwallet.card_menu.unmute"), EssentialColors.modalText(), () -> {
+            boolean now = SPWalletClient.cards().toggleIncoming(card.id());
+            CardInfoCache.incomingToggled(card.id(), now);
+            overlay.get().remove();
+        }));
+        if (row != null && row.number() != null) {
+            menu.child(this.menuItem(Component.translatable("gui.spwallet.card_menu.copy", row.number()),
+                    EssentialColors.modalText(), () -> {
+                        Minecraft.getInstance().keyboardHandler.setClipboard(row.number());
+                        overlay.get().remove();
+                    }));
+        }
+        menu.child(this.menuItem(Component.translatable("gui.spwallet.card_menu.delete"), EssentialColors.error(), () -> {
+            overlay.get().remove();
+            this.root.child(confirm(Component.translatable("modal.spwallet.delete_card.description").append(card.name() + "?"),
+                    20, Component.translatable("gui.spwallet.button.delete"), () -> {
+                        SPWalletClient.cards().remove(this.server, card);
+                        this.selectedCard = null;
+                        this.fillCardStack();
+                    }));
+        }));
+
+        menu.positioning(Positioning.absolute(at[0], at[1]));
+        FlowLayout layer = UIContainers.verticalFlow(Sizing.fill(100), Sizing.fill(100));
+        layer.child(menu);
+        OverlayContainer<UIComponent> container = UIContainers.overlay(layer);
+        container.closeOnClick(true);
+        container.surface(Surface.BLANK);
+        overlay.set(container);
+        this.root.child(container);
+    }
+
+    private UIComponent menuItem(Component text, int color, Runnable action) {
+        TransparentButton item = new TransparentButton(text, color, EssentialColors.tabTextHovered(),
+                EssentialColors.tabTextSelected(), pressed -> action.run());
+        item.shadow(EssentialColors.textShadow());
+        item.margins(Insets.vertical(2));
+        return item;
+    }
+
+    /**
+     * Shows or hides the side panel as {@link SPWalletConfig#sidePanelCollapsed} says; while it is
+     * hidden, the phone in the header stands in for its call tab.
      */
     private void layOutSideColumn() {
         boolean collapsed = SPWalletConfig.get().sidePanelCollapsed;
-        int cards = collapsed ? COLLAPSED_CARD_PANEL_PERCENT : CARD_PANEL_PERCENT;
-        int transfer = collapsed ? 100 - COLLAPSED_CARD_PANEL_PERCENT : TRANSFER_PANEL_PERCENT;
-
-        this.frame.horizontalSizing(Sizing.fill(collapsed ? 85 : 96));
-        this.cardColumns.forEach(column -> column.horizontalSizing(Sizing.fill(cards)));
-        this.transferColumns.forEach(column -> column.horizontalSizing(Sizing.fill(transfer)));
-        this.form.horizontalSizing(Sizing.fill(collapsed ? 70 : 88));
-
-        detach(this.sideNav);
-        detach(this.sideBar);
-        detach(this.sideBody);
-        detach(this.statusMark);
-        detach(this.settingsGear);
-
-        FlowLayout header = collapsed ? this.transferNav : this.sideNav;
-        // In the transfer header they sit left of the toggle, which takes the corner.
-        int shift = collapsed ? 14 : 0;
-        this.statusMark.margins(Insets.of(11, 0, 0, 26 + shift));
-        this.settingsGear.margins(Insets.of(11, 0, 0, 12 + shift));
-        header.child(this.statusMark).child(this.settingsGear);
-
+        detach(this.sideColumn);
         if (!collapsed) {
-            this.navRow.child(this.sideNav);
-            this.tabRow.child(this.sideBar);
-            this.bodyRow.child(this.sideBody);
+            this.mainRow.child(this.sideColumn);
+        }
+
+        this.callButton.positioning(Positioning.layout());
+        if (this.callButton instanceof TransparentButton phone) {
+            phone.text(Component.literal(collapsed ? "📞" : ""));
         }
 
         this.sideToggle.text(Component.literal(collapsed ? "«" : "»"));
@@ -576,9 +743,6 @@ public class WalletScreen extends EssentialScreen {
                 });
 
         button.shadow(EssentialColors.textShadow());
-        button.positioning(Positioning.relative(100, 0));
-        button.margins(Insets.of(11, 0, 0, 12));
-
         return button;
     }
 
@@ -590,6 +754,10 @@ public class WalletScreen extends EssentialScreen {
         if (this.sideTab == SideTab.QUICK) {
             this.sideBar.child(this.quickBar);
             this.sideContent.child(this.quickScroll);
+        } else if (this.sideTab == SideTab.CALL) {
+            this.sideBar.child(this.callBar);
+            this.sideContent.child(this.callScroll);
+            this.callList.show();
         } else {
             this.sideBar.child(this.historyBar);
             this.sideContent.child(this.historyScroll);
@@ -863,8 +1031,6 @@ public class WalletScreen extends EssentialScreen {
         update.run();
 
         button.shadow(EssentialColors.textShadow());
-        button.positioning(Positioning.relative(100, 0));
-        button.margins(Insets.of(11, 0, 0, 13));
 
         return button;
     }
@@ -873,8 +1039,6 @@ public class WalletScreen extends EssentialScreen {
     private UIComponent apiStatusMark() {
         ApiStatusMark mark = new ApiStatusMark();
         mark.shadow(EssentialColors.textShadow());
-        mark.positioning(Positioning.relative(100, 0));
-        mark.margins(Insets.of(11, 0, 0, 26));
 
         return mark;
     }
@@ -889,18 +1053,42 @@ public class WalletScreen extends EssentialScreen {
 
         button.shadow(EssentialColors.textShadow());
         button.tooltip(Component.translatable("gui.spwallet.button.settings"));
-        button.positioning(Positioning.relative(100, 0));
-        button.margins(Insets.of(11, 0, 0, 12));
 
         return button;
     }
 
     /**
-     * Swaps the wallet for the settings screen, and comes back to a fresh wallet afterwards: owo
+     * The phone left of the status dot while the side column is hidden: shows the column again,
+     * open on the call tab.
+     */
+    private UIComponent callButton() {
+        TransparentButton button = new TransparentButton(Component.literal("📞"),
+                EssentialColors.tabText(),
+                EssentialColors.tabTextHovered(),
+                EssentialColors.tabTextHovered(),
+                pressed -> {
+                    SPWalletConfig.get().sidePanelCollapsed = false;
+                    SPWalletConfig.HANDLER.save();
+                    this.sideTabs.select(SideTab.CALL);
+                    this.sideLayoutPending = true;
+                });
+
+        button.shadow(EssentialColors.textShadow());
+        button.tooltip(Component.translatable("gui.spwallet.button.call"));
+
+        return button;
+    }
+
+    private void openSettings() {
+        this.leaveFor(ConfigScreen::create);
+    }
+
+    /**
+     * Swaps the wallet for another screen, and comes back to a fresh wallet afterwards: owo
      * builds a screen once, so only a new one picks up a changed theme in the colours it takes
      * when it is built. What was typed into the form is carried over.
      */
-    private void openSettings() {
+    private void leaveFor(Function<Screen, @Nullable Screen> next) {
         // Put the player's own scale back first, so that the wallet waiting behind the settings
         // remembers that one rather than the forced scale as the one to restore.
         this.closing = true;
@@ -917,7 +1105,8 @@ public class WalletScreen extends EssentialScreen {
 
         WalletScreen wallet = new WalletScreen(this.server, target, amount == null ? 0 : amount,
                 this.commentBox.value());
-        Minecraft.getInstance().setScreen(ConfigScreen.create(wallet));
+        Screen screen = next.apply(wallet);
+        Minecraft.getInstance().setScreen(screen != null ? screen : wallet);
     }
 
     /**
@@ -962,21 +1151,76 @@ public class WalletScreen extends EssentialScreen {
         this.form.clearChildren();
 
         if (this.mode == TransferMode.NUMBER) {
-            this.form.child(this.numberBox);
-        } else {
-            // Side by side, because the form has to fit six rows into the panel.
             this.form.child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
-                    .child(this.nicknameBox.horizontalSizing(Sizing.fill(60)))
-                    .child(this.findButton.horizontalSizing(Sizing.fill(38)))
-                    .gap(4)
-                    .verticalAlignment(VerticalAlignment.CENTER));
-            this.form.child(this.playerCardsScroll);
+                    .child(this.numberBox.horizontalSizing(Sizing.fill(55)))
+                    .child(this.amountBox.horizontalSizing(Sizing.expand()))
+                    .gap(5));
+        } else {
+            // The nickname and what is known about the player on the left, their skin on the right.
+            this.form.child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
+                    .child(UIContainers.verticalFlow(Sizing.expand(), Sizing.content())
+                            .child(this.nicknameBox.horizontalSizing(Sizing.fill(100)))
+                            .child(this.info.margins(Insets.of(5, 0, 3, 0))))
+                    .child(this.skin)
+                    .gap(6));
+            this.form.child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
+                    .child(this.playerCards.horizontalSizing(Sizing.fill(55)))
+                    .child(this.amountBox.horizontalSizing(Sizing.expand()))
+                    .gap(5));
         }
 
-        this.form.child(this.amountBox)
-                .child(this.commentBox)
-                .child(this.transferButton)
-                .gap(7);
+        this.form.child(this.commentBox.horizontalSizing(Sizing.fill(100)))
+                .child(UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content())
+                        .child(this.transferButton)
+                        .horizontalAlignment(HorizontalAlignment.CENTER)
+                        .margins(Insets.top(4)))
+                .gap(6);
+        this.shownInfo = "";
+    }
+
+    /**
+     * The grey lines under the nickname. The public API tells nothing about another player but their
+     * cards, so these say only what is actually known: how many cards, whether they are online here,
+     * and how often the player paid them before.
+     */
+    private void refreshInfo() {
+        if (this.info == null || this.mode != TransferMode.NICKNAME) {
+            return;
+        }
+
+        String nickname = this.nicknameBox.value();
+        List<Component> lines = new ArrayList<>();
+
+        if (NICKNAME.matcher(nickname).matches()) {
+            if (this.playerCards.count() > 0) {
+                lines.add(Component.translatable("gui.spwallet.receiver.cards", this.playerCards.count()));
+            }
+
+            ClientPacketListener connection = Minecraft.getInstance().getConnection();
+            if (connection != null && connection.getPlayerInfoIgnoreCase(nickname) != null) {
+                lines.add(Component.translatable("gui.spwallet.receiver.online").withColor(EssentialColors.success()));
+            }
+
+            long paid = SPWalletClient.history().entries(this.server).stream()
+                    .filter(entry -> nickname.equalsIgnoreCase(entry.receiverName()))
+                    .count();
+            if (paid > 0) {
+                lines.add(Component.translatable("gui.spwallet.receiver.paid", paid));
+            }
+        }
+
+        String key = lines.stream().map(Component::getString).reduce("", (a, line) -> a + "|" + line);
+        if (key.equals(this.shownInfo)) {
+            return;
+        }
+
+        this.shownInfo = key;
+        this.info.clearChildren();
+        for (Component line : lines) {
+            this.info.child(UIComponents.label(line)
+                    .color(Color.ofArgb(EssentialColors.cardBalance()))
+                    .shadow(EssentialColors.textShadow()));
+        }
     }
 
     /** Looks up the cards of the player named in the nickname field. */
@@ -1032,31 +1276,6 @@ public class WalletScreen extends EssentialScreen {
 
                     return null;
                 }, client);
-    }
-
-    private CardList buildCardList(FlowLayout rootComponent) {
-        return new CardList(SPWalletClient.cards().cards(this.server),
-                card -> {
-                    this.selectedCard = card;
-                    this.revalidate.run();
-                },
-                card -> rootComponent.child(this.confirmDeletion(rootComponent, card)));
-    }
-
-    /** Drops the current card list and builds it again from storage. */
-    private void reloadCards(FlowLayout rootComponent) {
-        this.selectedCard = null;
-        this.cardList.child(this.buildCardList(rootComponent));
-        this.revalidate.run();
-    }
-
-    /** The "do you really want to delete this card" overlay. */
-    private OverlayContainer<UIComponent> confirmDeletion(FlowLayout rootComponent, Card card) {
-        return confirm(Component.translatable("modal.spwallet.delete_card.description").append(card.name() + "?"),
-                20, Component.translatable("gui.spwallet.button.delete"), () -> {
-                    SPWalletClient.cards().remove(this.server, card);
-                    this.reloadCards(rootComponent);
-                });
     }
 
     /**

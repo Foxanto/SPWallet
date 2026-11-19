@@ -17,8 +17,6 @@ import ru.foxanto.spwallet.util.SPServer;
  */
 public class AmountGameTest implements FabricClientGameTest {
     /** Where the transfer button is in the test window, read off the screenshots. */
-    private static final double TRANSFER_BUTTON_X = 452;
-    private static final double TRANSFER_BUTTON_Y = 400;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -40,9 +38,7 @@ public class AmountGameTest implements FabricClientGameTest {
             // stubbed transfer only goes out on the overlay's own button, which is not pressed.
             context.setScreen(() -> new WalletScreen(SPServer.SP, new Transaction("12345", 500, "Test")));
             context.waitTicks(10);
-            context.getInput().setCursorPos(TRANSFER_BUTTON_X, TRANSFER_BUTTON_Y);
-            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-            context.waitTicks(2);
+            Ui.click(context, Ui.text("Send"), "the Send button");
             context.takeScreenshot("spwallet_confirm_transfer");
 
             context.setScreen(() -> null);
